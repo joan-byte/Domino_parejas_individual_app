@@ -1,0 +1,1 @@
+# Domino_parejas_individual_app
