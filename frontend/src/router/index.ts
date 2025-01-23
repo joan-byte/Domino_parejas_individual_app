@@ -1,16 +1,28 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import { createRouter, createWebHistory } from 'vue-router'
+import CrearCampeonato from '../views/CrearCampeonato.vue'
+import ModificarCampeonato from '../views/ModificarCampeonato.vue'
+import Home from '../views/Home.vue'
 
-const routes: RouteRecordRaw[] = [
+const routes = [
   {
     path: '/',
     name: 'home',
-    component: HomeView
+    component: Home
+  },
+  {
+    path: '/crear-campeonato',
+    name: 'crear-campeonato',
+    component: CrearCampeonato
+  },
+  {
+    path: '/modificar-campeonato/:id',
+    name: 'modificar-campeonato',
+    component: ModificarCampeonato
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(),
   routes
 })
 
