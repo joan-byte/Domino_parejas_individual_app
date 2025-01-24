@@ -1,25 +1,28 @@
 from pydantic import BaseModel
-from typing import Optional
 
 class JugadorBase(BaseModel):
     nombre: str
-    apellido: str
-    club: Optional[str] = None
-    activo: Optional[bool] = True
+    apellidos: str
+    club: str | None = None
 
 class JugadorCreate(JugadorBase):
-    campeonato_id: Optional[int] = None
+    campeonato_id: int
 
-class JugadorUpdate(BaseModel):
-    nombre: Optional[str] = None
-    apellido: Optional[str] = None
-    club: Optional[str] = None
-    activo: Optional[bool] = None
-    campeonato_id: Optional[int] = None
+class JugadorUpdate(JugadorBase):
+    pass
 
 class JugadorResponse(JugadorBase):
     id: int
-    campeonato_id: Optional[int] = None
-    
+    campeonato_id: int
+    activo: bool
+
+    class Config:
+        from_attributes = True
+
+class Jugador(JugadorBase):
+    id: int
+    campeonato_id: int
+    activo: bool
+
     class Config:
         from_attributes = True 

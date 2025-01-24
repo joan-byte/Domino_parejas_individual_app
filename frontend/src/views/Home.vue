@@ -60,6 +60,8 @@ const formatDate = (dateString) => {
 const seleccionarCampeonato = (campeonato) => {
   campeonatoSeleccionado.value = campeonato
   localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+  // Disparar el evento storage para que App.vue detecte el cambio
+  window.dispatchEvent(new Event('storage'))
 }
 
 const modificarCampeonato = (id) => {
@@ -68,7 +70,7 @@ const modificarCampeonato = (id) => {
 
 const cargarCampeonatos = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/v1/campeonatos/')
+    const response = await axios.get('http://localhost:8000/api/campeonatos/')
     campeonatos.value = response.data
     
     // Recuperar campeonato seleccionado del localStorage
@@ -90,7 +92,7 @@ const cargarCampeonatos = async () => {
 const eliminarCampeonato = async (id) => {
   if (confirm('¿Está seguro de que desea eliminar este campeonato?')) {
     try {
-      await axios.delete(`http://localhost:8000/api/v1/campeonatos/${id}`)
+      await axios.delete(`http://localhost:8000/api/campeonatos/${id}`)
       if (campeonatoSeleccionado.value?.id === id) {
         campeonatoSeleccionado.value = null
         localStorage.removeItem('campeonatoSeleccionado')

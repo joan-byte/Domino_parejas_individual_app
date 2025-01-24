@@ -2,7 +2,7 @@
   <div id="app">
     <nav class="navbar">
       <div class="nav-left">
-        <router-link to="/" class="nav-link">Inicio</router-link>
+        <router-link to="/" class="nav-link" @click="limpiarCampeonato">Inicio</router-link>
         <router-link 
           v-if="!campeonatoSeleccionado" 
           to="/crear-campeonato" 
@@ -12,7 +12,12 @@
         </router-link>
       </div>
       <div v-if="campeonatoSeleccionado" class="nav-right">
-        <router-link to="/inscripcion" class="nav-link">Inscripción</router-link>
+        <router-link 
+          :to="`/inscripcion/${campeonatoSeleccionado.id}`" 
+          class="nav-link"
+        >
+          Inscripción
+        </router-link>
         
         <div class="dropdown">
           <button class="nav-link dropdown-toggle">
@@ -51,6 +56,11 @@ const checkCampeonatoSeleccionado = () => {
   campeonatoSeleccionado.value = campeonatoGuardado ? JSON.parse(campeonatoGuardado) : null
 }
 
+const limpiarCampeonato = () => {
+  localStorage.removeItem('campeonatoSeleccionado')
+  campeonatoSeleccionado.value = null
+}
+
 onMounted(() => {
   checkCampeonatoSeleccionado()
   window.addEventListener('storage', checkCampeonatoSeleccionado)
@@ -87,6 +97,8 @@ onMounted(() => {
   padding: 0.5rem 1rem;
   border-radius: 4px;
   transition: background-color 0.3s;
+  font-weight: 800 !important;
+  font-size: 1.3rem !important;
 }
 
 .nav-link:hover {

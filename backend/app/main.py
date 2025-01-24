@@ -5,7 +5,7 @@ from app.core.config import settings
 from app.routes import mesa, resultado, pareja_partida, jugador, campeonato
 
 # Configurar logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -16,33 +16,28 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Configuración CORS
+# Configurar CORS
 origins = [
-    "http://localhost:5173",    # Vite dev server
+    "http://localhost:5173",    # Frontend URL
     "http://127.0.0.1:5173",
-    "http://localhost:8000",    # Backend FastAPI
-    "http://127.0.0.1:8000"     # Backend FastAPI alternativo
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"]
 )
 
-# Incluir las rutas
+# Registrar las rutas
 logger.info("Registrando rutas de la API...")
-
-# Incluir los routers sin prefijos adicionales
-app.include_router(campeonato.router)
-app.include_router(jugador.router)
 app.include_router(mesa.router)
 app.include_router(resultado.router)
 app.include_router(pareja_partida.router)
-
+app.include_router(jugador.router)
+app.include_router(campeonato.router)
 logger.info("Todas las rutas han sido registradas")
 
 @app.get("/")

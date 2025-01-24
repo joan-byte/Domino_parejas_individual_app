@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Crear el router con configuración explícita
 router = APIRouter(
-    prefix="/api/v1/campeonatos",
+    prefix="/api/campeonatos",
     tags=["campeonatos"]
 )
 

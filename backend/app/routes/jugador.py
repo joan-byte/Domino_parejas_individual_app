@@ -6,38 +6,44 @@ from app.db.base import get_db
 from app.models.jugador import Jugador
 from app.schemas.jugador import JugadorCreate, JugadorResponse, JugadorUpdate
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/jugadores",
+    tags=["jugadores"]
+)
 
-@router.post("/jugadores/", response_model=JugadorResponse)
-def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db)):
+@router.post("/", response_model=JugadorResponse)
+async def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db)):
     """Crear un nuevo jugador"""
-    # Verificar si ya existe un jugador con el mismo nombre y apellido
+    # Verificar si ya existe un jugador con el mismo nombre y apellidos
     existing_jugador = db.query(Jugador).filter(
         and_(
             Jugador.nombre == jugador.nombre,
-            Jugador.apellido == jugador.apellido
+            Jugador.apellidos == jugador.apellidos
         )
     ).first()
     
     if existing_jugador:
         raise HTTPException(
             status_code=400,
-            detail=f"Ya existe un jugador con el nombre {jugador.nombre} {jugador.apellido}"
+            detail=f"Ya existe un jugador con el nombre {jugador.nombre} {jugador.apellidos}"
         )
     
-    db_jugador = Jugador(**jugador.dict())
+    # Crear el jugador con los campos del esquema y establecer activo=True
+    jugador_data = jugador.dict()
+    jugador_data['activo'] = True  # Forzar activo=True al crear
+    db_jugador = Jugador(**jugador_data)
     db.add(db_jugador)
     db.commit()
     db.refresh(db_jugador)
     return db_jugador
 
-@router.get("/jugadores/", response_model=List[JugadorResponse])
+@router.get("/", response_model=List[JugadorResponse])
 def read_jugadores(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Obtener lista de jugadores"""
     jugadores = db.query(Jugador).offset(skip).limit(limit).all()
     return jugadores
 
-@router.get("/jugadores/{jugador_id}", response_model=JugadorResponse)
+@router.get("/{jugador_id}", response_model=JugadorResponse)
 def read_jugador(jugador_id: int, db: Session = Depends(get_db)):
     """Obtener un jugador específico"""
     jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
@@ -45,22 +51,22 @@ def read_jugador(jugador_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Jugador no encontrado")
     return jugador
 
-@router.put("/jugadores/{jugador_id}", response_model=JugadorResponse)
+@router.put("/{jugador_id}", response_model=JugadorResponse)
 def update_jugador(jugador_id: int, jugador: JugadorUpdate, db: Session = Depends(get_db)):
     """Actualizar un jugador"""
     db_jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
     if db_jugador is None:
         raise HTTPException(status_code=404, detail="Jugador no encontrado")
     
-    # Si se está actualizando nombre o apellido, verificar que no exista otro jugador con esa combinación
-    if (jugador.nombre is not None or jugador.apellido is not None):
+    # Si se está actualizando nombre o apellidos, verificar que no exista otro jugador con esa combinación
+    if (jugador.nombre is not None or jugador.apellidos is not None):
         nuevo_nombre = jugador.nombre if jugador.nombre is not None else db_jugador.nombre
-        nuevo_apellido = jugador.apellido if jugador.apellido is not None else db_jugador.apellido
+        nuevo_apellidos = jugador.apellidos if jugador.apellidos is not None else db_jugador.apellidos
         
         existing_jugador = db.query(Jugador).filter(
             and_(
                 Jugador.nombre == nuevo_nombre,
-                Jugador.apellido == nuevo_apellido,
+                Jugador.apellidos == nuevo_apellidos,
                 Jugador.id != jugador_id
             )
         ).first()
@@ -68,7 +74,7 @@ def update_jugador(jugador_id: int, jugador: JugadorUpdate, db: Session = Depend
         if existing_jugador:
             raise HTTPException(
                 status_code=400,
-                detail=f"Ya existe un jugador con el nombre {nuevo_nombre} {nuevo_apellido}"
+                detail=f"Ya existe un jugador con el nombre {nuevo_nombre} {nuevo_apellidos}"
             )
     
     for key, value in jugador.dict(exclude_unset=True).items():
@@ -78,7 +84,7 @@ def update_jugador(jugador_id: int, jugador: JugadorUpdate, db: Session = Depend
     db.refresh(db_jugador)
     return db_jugador
 
-@router.delete("/jugadores/{jugador_id}")
+@router.delete("/{jugador_id}")
 def delete_jugador(jugador_id: int, db: Session = Depends(get_db)):
     """Eliminar un jugador"""
     db_jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
@@ -89,9 +95,20 @@ def delete_jugador(jugador_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Jugador eliminado"}
 
-@router.get("/jugadores/campeonato/{campeonato_id}", response_model=List[JugadorResponse])
-def read_jugadores_by_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
+@router.get("/campeonato/{campeonato_id}", response_model=List[JugadorResponse])
+async def get_jugadores_by_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
     """Obtener jugadores de un campeonato específico"""
     jugadores = db.query(Jugador).filter(Jugador.campeonato_id == campeonato_id).all()
     return jugadores
+
+@router.put("/{jugador_id}/toggle-activo", response_model=JugadorResponse)
+async def toggle_jugador_activo(jugador_id: int, db: Session = Depends(get_db)):
+    jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
+    if not jugador:
+        raise HTTPException(status_code=404, detail="Jugador no encontrado")
+    
+    jugador.activo = not jugador.activo
+    db.commit()
+    db.refresh(jugador)
+    return jugador
     
