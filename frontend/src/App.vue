@@ -25,8 +25,10 @@
             <span class="arrow">▼</span>
           </button>
           <div class="dropdown-content">
-            <router-link to="/mesas/asignacion" class="dropdown-item">Asignación</router-link>
-            <router-link to="/mesas/registro" class="dropdown-item">Registro</router-link>
+            <div class="dropdown-menu" aria-labelledby="navbarDropdownMesas">
+              <router-link :to="`/mesas/asignacion/${campeonatoSeleccionado.id}`" class="dropdown-item">Asignación</router-link>
+              <router-link :to="`/mesas/registro/${campeonatoSeleccionado.id}`" class="dropdown-item">Registro</router-link>
+            </div>
           </div>
         </div>
 

@@ -8,7 +8,10 @@ from app.models.pareja_partida import ParejaPartida
 from app.models.resultado import Resultado
 from app.schemas.pareja_partida import ParejaPartidaCreate, ParejaPartida as ParejaPartidaSchema, SorteoInicial
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/v1",
+    tags=["parejas-partida"]
+)
 
 @router.post("/parejas-partida/sorteo-inicial/", response_model=List[ParejaPartidaSchema])
 def crear_parejas_sorteo_inicial(datos: SorteoInicial, db: Session = Depends(get_db)):
@@ -142,4 +145,21 @@ def get_parejas_mesa(campeonato_id: int, partida: int, mesa: int, db: Session = 
         ParejaPartida.partida == partida,
         ParejaPartida.mesa == mesa
     ).order_by(ParejaPartida.numero_pareja).all()
-    return parejas 
+    return parejas
+
+@router.delete("/parejas-partida/eliminar/{campeonato_id}/{partida}")
+def eliminar_parejas_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Elimina todas las parejas de una partida específica"""
+    parejas = db.query(ParejaPartida).filter(
+        ParejaPartida.campeonato_id == campeonato_id,
+        ParejaPartida.partida == partida
+    ).all()
+    
+    if not parejas:
+        raise HTTPException(status_code=404, detail="No se encontraron parejas para eliminar")
+    
+    for pareja in parejas:
+        db.delete(pareja)
+    
+    db.commit()
+    return {"message": "Parejas eliminadas correctamente"} 

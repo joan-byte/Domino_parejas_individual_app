@@ -26,12 +26,12 @@ const routes = [
     component: Inscripcion
   },
   {
-    path: '/mesas/asignacion',
+    path: '/mesas/asignacion/:campeonatoId',
     name: 'asignacion-mesas',
     component: () => import('../views/mesas/AsignacionMesas.vue')
   },
   {
-    path: '/mesas/registro',
+    path: '/mesas/registro/:campeonatoId',
     name: 'registro-mesas',
     component: () => import('../views/mesas/RegistroMesas.vue')
   },

@@ -1,49 +1,60 @@
 <template>
   <div class="inscripcion-container">
-    <button class="btn-finalizar" @click="finalizarInscripcion">
-      Finalizar Inscripción
+    <button 
+      :class="['btn-accion', inscripcionFinalizada ? 'btn-volver' : 'btn-finalizar']"
+      @click="inscripcionFinalizada ? volverAtras() : finalizarInscripcion()"
+    >
+      {{ inscripcionFinalizada ? 'Volver Atrás' : 'Finalizar Inscripción' }}
     </button>
 
-    <h2>Inscripción de Jugador</h2>
-    <form @submit.prevent="guardarJugador" class="inscripcion-form" autocomplete="off">
-      <div class="form-group">
-        <label for="nombre">Nombre:</label>
-        <input 
-          type="text" 
-          id="nombre" 
-          ref="nombreInput"
-          v-model="jugador.nombre" 
-          required 
-          class="form-control"
-          autocomplete="off"
-        >
-      </div>
+    <div v-if="!inscripcionFinalizada">
+      <h2>Inscripción de Jugador</h2>
+      <form @submit.prevent="guardarJugador" class="inscripcion-form" autocomplete="off">
+        <div class="form-group">
+          <label for="nombre">Nombre:</label>
+          <input 
+            type="text" 
+            id="nombre" 
+            ref="nombreInput"
+            v-model="jugador.nombre" 
+            required 
+            class="form-control"
+            autocomplete="off"
+          >
+        </div>
 
-      <div class="form-group">
-        <label for="apellidos">Apellidos:</label>
-        <input 
-          type="text" 
-          id="apellidos" 
-          v-model="jugador.apellidos" 
-          required 
-          class="form-control"
-          autocomplete="off"
-        >
-      </div>
+        <div class="form-group">
+          <label for="apellidos">Apellidos:</label>
+          <input 
+            type="text" 
+            id="apellidos" 
+            v-model="jugador.apellidos" 
+            required 
+            class="form-control"
+            autocomplete="off"
+          >
+        </div>
 
-      <div class="form-group">
-        <label for="club">Club:</label>
-        <input 
-          type="text" 
-          id="club" 
-          v-model="jugador.club" 
-          class="form-control"
-          autocomplete="off"
-        >
-      </div>
+        <div class="form-group">
+          <label for="club">Club:</label>
+          <input 
+            type="text" 
+            id="club" 
+            v-model="jugador.club" 
+            class="form-control"
+            autocomplete="off"
+          >
+        </div>
 
-      <button type="submit" class="btn-submit">Inscribir Jugador</button>
-    </form>
+        <button type="submit" class="btn-submit">Inscribir Jugador</button>
+      </form>
+    </div>
+
+    <div v-if="inscripcionFinalizada" class="sorteo-realizado">
+      <h2>Sorteo Inicial Realizado</h2>
+      <p>El sorteo inicial ha sido completado. Las parejas y mesas han sido asignadas aleatoriamente.</p>
+      <p>Puede ver los resultados en la sección de Mesas.</p>
+    </div>
 
     <div class="jugadores-list">
       <h3>Jugadores Inscritos</h3>
@@ -86,12 +97,14 @@
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
+const router = useRouter()
 const campeonatoId = route.params.campeonatoId
 const jugadores = ref([])
 const nombreInput = ref(null)
+const inscripcionFinalizada = ref(false)
 
 const jugador = reactive({
   nombre: '',
@@ -207,15 +220,79 @@ const guardarJugador = async () => {
   }
 }
 
-const finalizarInscripcion = () => {
-  // Implementa la lógica para finalizar la inscripción
-  alert('Finalizar Inscripción')
+const finalizarInscripcion = async () => {
+  // Verificar que hay suficientes jugadores activos (mínimo 4 para formar una mesa)
+  const jugadoresActivos = jugadores.value.filter(j => j.activo && j.campeonato_id === parseInt(campeonatoId))
+  if (jugadoresActivos.length < 4) {
+    alert('Se necesitan al menos 4 jugadores activos para realizar el sorteo')
+    return
+  }
+
+  try {
+    // Realizar el sorteo inicial
+    const response = await fetch('http://localhost:8000/api/v1/parejas-partida/sorteo-inicial/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        campeonato_id: parseInt(campeonatoId),
+        jugadores: jugadoresActivos.map(j => j.id)
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Error al realizar el sorteo inicial')
+    }
+
+    inscripcionFinalizada.value = true
+    alert('Sorteo inicial realizado con éxito')
+  } catch (error) {
+    console.error('Error:', error)
+    alert(error.message || 'Error al realizar el sorteo inicial')
+  }
 }
 
-// Cargar jugadores y poner foco en el input al montar el componente
+const volverAtras = async () => {
+  try {
+    // Eliminar las asignaciones de parejas y mesas
+    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/eliminar/${campeonatoId}/1`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('Error al eliminar las asignaciones')
+    }
+
+    inscripcionFinalizada.value = false
+    alert('Las asignaciones han sido eliminadas. Puede realizar un nuevo sorteo.')
+  } catch (error) {
+    console.error('Error:', error)
+    alert('Error al eliminar las asignaciones')
+  }
+}
+
+const verificarSorteoExistente = async () => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/1`)
+    if (response.ok) {
+      const parejas = await response.json()
+      inscripcionFinalizada.value = parejas.length > 0
+    }
+  } catch (error) {
+    console.error('Error al verificar sorteo:', error)
+  }
+}
+
+// Modificar onMounted para incluir la verificación
 onMounted(() => {
   cargarJugadores()
   focusNombreInput()
+  verificarSorteoExistente()
 })
 </script>
 
@@ -226,10 +303,8 @@ onMounted(() => {
   padding: 20px;
 }
 
-.btn-finalizar {
+.btn-accion {
   width: 100%;
-  background-color: #dc3545;
-  color: white;
   padding: 12px;
   border: none;
   border-radius: 4px;
@@ -240,8 +315,22 @@ onMounted(() => {
   transition: background-color 0.3s;
 }
 
+.btn-finalizar {
+  background-color: #dc3545;
+  color: white;
+}
+
 .btn-finalizar:hover {
   background-color: #c82333;
+}
+
+.btn-volver {
+  background-color: #fd7e14;
+  color: white;
+}
+
+.btn-volver:hover {
+  background-color: #e76b00;
 }
 
 .inscripcion-form {
@@ -333,5 +422,20 @@ onMounted(() => {
 
 .estado-inactivo {
   color: #dc3545;
+}
+
+.sorteo-realizado {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.sorteo-realizado h2 {
+  color: #28a745;
+  margin-bottom: 1rem;
+}
+
+.sorteo-realizado p {
+  color: #666;
+  margin-bottom: 0.5rem;
 }
 </style> 
