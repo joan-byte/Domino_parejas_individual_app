@@ -24,6 +24,26 @@ const routes = [
     path: '/inscripcion/:campeonatoId',
     name: 'inscripcion',
     component: Inscripcion
+  },
+  {
+    path: '/mesas/asignacion',
+    name: 'asignacion-mesas',
+    component: () => import('../views/mesas/AsignacionMesas.vue')
+  },
+  {
+    path: '/mesas/registro',
+    name: 'registro-mesas',
+    component: () => import('../views/mesas/RegistroMesas.vue')
+  },
+  {
+    path: '/resultados/ranking',
+    name: 'ranking',
+    component: () => import('../views/resultados/Ranking.vue')
+  },
+  {
+    path: '/resultados/podium',
+    name: 'podium',
+    component: () => import('../views/resultados/Podium.vue')
   }
 ]
 

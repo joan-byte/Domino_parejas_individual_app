@@ -1,5 +1,9 @@
 <template>
   <div class="inscripcion-container">
+    <button class="btn-finalizar" @click="finalizarInscripcion">
+      Finalizar Inscripción
+    </button>
+
     <h2>Inscripción de Jugador</h2>
     <form @submit.prevent="guardarJugador" class="inscripcion-form" autocomplete="off">
       <div class="form-group">
@@ -7,6 +11,7 @@
         <input 
           type="text" 
           id="nombre" 
+          ref="nombreInput"
           v-model="jugador.nombre" 
           required 
           class="form-control"
@@ -61,7 +66,9 @@
             <td>{{ j.apellidos }}</td>
             <td>{{ j.club }}</td>
             <td>{{ j.campeonato_id }}</td>
-            <td>{{ j.activo ? 'Activo' : 'Inactivo' }}</td>
+            <td :class="['estado', j.activo ? 'estado-activo' : 'estado-inactivo']">
+              {{ j.activo ? 'Activo' : 'Inactivo' }}
+            </td>
             <td>
               <button 
                 @click="toggleActivo(j.id)" 
@@ -84,6 +91,7 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 const campeonatoId = route.params.campeonatoId
 const jugadores = ref([])
+const nombreInput = ref(null)
 
 const jugador = reactive({
   nombre: '',
@@ -91,6 +99,12 @@ const jugador = reactive({
   club: '',
   campeonatoId: campeonatoId
 })
+
+const focusNombreInput = () => {
+  if (nombreInput.value) {
+    nombreInput.value.focus()
+  }
+}
 
 const cargarJugadores = async () => {
   try {
@@ -161,33 +175,48 @@ const guardarJugador = async () => {
       })
     })
 
-    if (response.ok) {
-      const nuevoJugador = await response.json()
-      // Añadir el nuevo jugador al inicio de la lista (ya que tendrá el ID más alto)
-      jugadores.value.unshift(nuevoJugador)
-      
-      // Limpiar el formulario
-      Object.assign(jugador, {
-        nombre: '',
-        apellidos: '',
-        club: '',
-        campeonatoId: campeonatoId
-      })
-      
-      // Mostrar mensaje de éxito
-      alert('Jugador inscrito correctamente')
-    } else {
+    if (!response.ok) {
       const errorData = await response.json()
-      alert(`Error al inscribir el jugador: ${errorData.detail || 'Error desconocido'}`)
+      alert(errorData.detail)
+      // Refrescar la página si el error es de jugador duplicado
+      if (errorData.detail.includes('ya está inscrito en este campeonato')) {
+        window.location.reload()
+      }
+      return
     }
+
+    const nuevoJugador = await response.json()
+    jugadores.value.unshift(nuevoJugador)
+    
+    // Limpiar el formulario
+    Object.assign(jugador, {
+      nombre: '',
+      apellidos: '',
+      club: '',
+      campeonatoId: campeonatoId
+    })
+    
+    // Mostrar mensaje de éxito
+    alert('Jugador inscrito correctamente')
+    
+    // Poner el foco en el input de nombre
+    focusNombreInput()
   } catch (error) {
     console.error('Error:', error)
     alert('Error al inscribir el jugador')
   }
 }
 
-// Cargar jugadores al montar el componente
-onMounted(cargarJugadores)
+const finalizarInscripcion = () => {
+  // Implementa la lógica para finalizar la inscripción
+  alert('Finalizar Inscripción')
+}
+
+// Cargar jugadores y poner foco en el input al montar el componente
+onMounted(() => {
+  cargarJugadores()
+  focusNombreInput()
+})
 </script>
 
 <style scoped>
@@ -195,6 +224,24 @@ onMounted(cargarJugadores)
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
+}
+
+.btn-finalizar {
+  width: 100%;
+  background-color: #dc3545;
+  color: white;
+  padding: 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  transition: background-color 0.3s;
+}
+
+.btn-finalizar:hover {
+  background-color: #c82333;
 }
 
 .inscripcion-form {
@@ -274,5 +321,17 @@ onMounted(cargarJugadores)
 
 .btn-toggle:hover {
   opacity: 0.9;
+}
+
+.estado {
+  font-weight: bold;
+}
+
+.estado-activo {
+  color: #28a745;
+}
+
+.estado-inactivo {
+  color: #dc3545;
 }
 </style> 

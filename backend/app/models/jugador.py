@@ -15,9 +15,9 @@ class Jugador(Base):
     # Relaciones
     campeonato = relationship("Campeonato", back_populates="jugadores")
 
-    # Restricción única compuesta para nombre y apellido
+    # Restricción única compuesta para nombre, apellidos y campeonato
     __table_args__ = (
-        UniqueConstraint('nombre', 'apellidos', name='uix_nombre_apellidos'),
+        UniqueConstraint('nombre', 'apellidos', 'campeonato_id', name='uix_nombre_apellidos_campeonato'),
     )
     
 

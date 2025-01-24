@@ -14,18 +14,19 @@ router = APIRouter(
 @router.post("/", response_model=JugadorResponse)
 async def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db)):
     """Crear un nuevo jugador"""
-    # Verificar si ya existe un jugador con el mismo nombre y apellidos
+    # Verificar si ya existe un jugador con el mismo nombre y apellidos en el mismo campeonato
     existing_jugador = db.query(Jugador).filter(
         and_(
             Jugador.nombre == jugador.nombre,
-            Jugador.apellidos == jugador.apellidos
+            Jugador.apellidos == jugador.apellidos,
+            Jugador.campeonato_id == jugador.campeonato_id
         )
     ).first()
     
     if existing_jugador:
         raise HTTPException(
             status_code=400,
-            detail=f"Ya existe un jugador con el nombre {jugador.nombre} {jugador.apellidos}"
+            detail=f"El jugador {jugador.nombre} {jugador.apellidos} ya está inscrito en este campeonato"
         )
     
     # Crear el jugador con los campos del esquema y establecer activo=True
@@ -67,6 +68,7 @@ def update_jugador(jugador_id: int, jugador: JugadorUpdate, db: Session = Depend
             and_(
                 Jugador.nombre == nuevo_nombre,
                 Jugador.apellidos == nuevo_apellidos,
+                Jugador.campeonato_id == db_jugador.campeonato_id,
                 Jugador.id != jugador_id
             )
         ).first()
@@ -74,7 +76,7 @@ def update_jugador(jugador_id: int, jugador: JugadorUpdate, db: Session = Depend
         if existing_jugador:
             raise HTTPException(
                 status_code=400,
-                detail=f"Ya existe un jugador con el nombre {nuevo_nombre} {nuevo_apellidos}"
+                detail=f"Ya existe otro jugador con el nombre {nuevo_nombre} {nuevo_apellidos} en este campeonato"
             )
     
     for key, value in jugador.dict(exclude_unset=True).items():
