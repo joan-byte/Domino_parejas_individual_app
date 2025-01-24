@@ -48,17 +48,27 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, watch } from 'vue'
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
 
-const campeonatoSeleccionado = ref(null)
+interface Campeonato {
+  id: number
+  nombre: string
+  fecha_inicio: string
+  dias_duracion: number
+  numero_partidas: number
+  activo: boolean
+  partida_actual: number
+}
 
-const checkCampeonatoSeleccionado = () => {
+const campeonatoSeleccionado = ref<Campeonato | null>(null)
+
+const checkCampeonatoSeleccionado = (): void => {
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
   campeonatoSeleccionado.value = campeonatoGuardado ? JSON.parse(campeonatoGuardado) : null
 }
 
-const limpiarCampeonato = () => {
+const limpiarCampeonato = (): void => {
   localStorage.removeItem('campeonatoSeleccionado')
   campeonatoSeleccionado.value = null
 }

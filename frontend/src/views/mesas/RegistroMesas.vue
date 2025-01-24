@@ -17,12 +17,12 @@
           <div class="parejas-row">
             <div class="pareja-info">
               <span class="pareja-label">Pareja 1:</span>
-              {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }}, {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }}
+              {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}, {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
             </div>
             <div class="separator">y</div>
             <div class="pareja-info">
               <span class="pareja-label">Pareja 2:</span>
-              {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }}, {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }}
+              {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}, {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
             </div>
           </div>
           <div class="actions">

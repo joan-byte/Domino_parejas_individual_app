@@ -41,5 +41,8 @@ declare module 'vue' {
   export const defineOptions: Function
   export const defineModel: Function
   export const withDefaults: Function
+  export const ref: <T>(value: T) => { value: T }
+  export const onMounted: (callback: () => void) => void
+  export type Ref<T> = { value: T }
 }
   

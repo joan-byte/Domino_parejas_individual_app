@@ -1,8 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import Home from '../views/Home.vue'
 import CrearCampeonato from '../views/CrearCampeonato.vue'
 import ModificarCampeonato from '../views/ModificarCampeonato.vue'
-import Home from '../views/Home.vue'
 import Inscripcion from '../views/Inscripcion.vue'
+import AsignacionMesas from '../views/mesas/AsignacionMesas.vue'
+import RegistroMesas from '../views/mesas/RegistroMesas.vue'
+import Ranking from '../views/resultados/Ranking.vue'
+import Podium from '../views/resultados/Podium.vue'
 
 const routes = [
   {
@@ -28,22 +32,22 @@ const routes = [
   {
     path: '/mesas/asignacion/:campeonatoId',
     name: 'asignacion-mesas',
-    component: () => import('../views/mesas/AsignacionMesas.vue')
+    component: AsignacionMesas
   },
   {
     path: '/mesas/registro/:campeonatoId',
     name: 'registro-mesas',
-    component: () => import('../views/mesas/RegistroMesas.vue')
+    component: RegistroMesas
   },
   {
     path: '/resultados/ranking',
     name: 'ranking',
-    component: () => import('../views/resultados/Ranking.vue')
+    component: Ranking
   },
   {
     path: '/resultados/podium',
     name: 'podium',
-    component: () => import('../views/resultados/Podium.vue')
+    component: Podium
   }
 ]
 
