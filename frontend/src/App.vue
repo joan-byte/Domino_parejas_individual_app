@@ -85,16 +85,23 @@ onMounted(() => {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
-  height: 100vh;
+  min-height: 100vh;
+  padding-top: 80px; /* Espacio para la navbar fija */
 }
 
 .navbar {
   background-color: #4CAF50;
   padding: 1rem 2rem;
-  margin-bottom: 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  height: 64px; /* Altura fija para la navbar */
 }
 
 .nav-left, .nav-right {

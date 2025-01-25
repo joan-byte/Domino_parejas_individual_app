@@ -3,7 +3,7 @@
     <div class="header">
       <h2>Registro de Mesas</h2>
       <div class="partida-info">
-        <span>Partida: 1</span>
+        <span>Partida: {{ partida }}</span>
       </div>
     </div>
     
@@ -17,17 +17,53 @@
           <div class="parejas-row">
             <div class="pareja-info">
               <span class="pareja-label">Pareja 1:</span>
-              {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}, {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
+              <div class="jugadores">
+                <span class="jugador">
+                  {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
+                </span>
+                <span class="jugador-separator">,</span>
+                <span class="jugador">
+                  {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
+                </span>
+              </div>
             </div>
             <div class="separator">y</div>
             <div class="pareja-info">
               <span class="pareja-label">Pareja 2:</span>
-              {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}, {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
+              <div class="jugadores">
+                <span class="jugador">
+                  {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
+                </span>
+                <span class="jugador-separator">,</span>
+                <span class="jugador">
+                  {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
+                </span>
+              </div>
             </div>
           </div>
           <div class="actions">
-            <button class="btn-registrar">Registrar</button>
-            <button class="btn-modificar" disabled>Modificar</button>
+            <button 
+              :class="{
+                'btn-registrar': true,
+                'btn-primary': !mesasRegistradas[mesa.numeroMesa],
+                'btn-secondary': mesasRegistradas[mesa.numeroMesa]
+              }"
+              @click="abrirRegistro(mesa)"
+              :disabled="mesasRegistradas[mesa.numeroMesa]"
+            >
+              Registrar
+            </button>
+            <button 
+              :class="{
+                'btn-modificar': true,
+                'btn-primary': mesasRegistradas[mesa.numeroMesa],
+                'btn-secondary': !mesasRegistradas[mesa.numeroMesa]
+              }"
+              @click="abrirModificacion(mesa)"
+              :disabled="!mesasRegistradas[mesa.numeroMesa]"
+            >
+              Modificar
+            </button>
           </div>
         </div>
       </div>
@@ -35,16 +71,31 @@
     <div v-else>
       <p>No hay mesas asignadas todavía.</p>
     </div>
+
+    <ResultadoMesaPopup
+      v-model:show="showPopup"
+      :mesa="mesaSeleccionada"
+      :campeonato-id="campeonatoId"
+      :partida="partida"
+      :resultado-existente="resultadoExistente"
+      @resultado-guardado="onResultadoGuardado"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import ResultadoMesaPopup from '@/components/ResultadoMesaPopup.vue'
 
 const route = useRoute()
-const campeonatoId = route.params.campeonatoId
+const campeonatoId = parseInt(route.params.campeonatoId)
+const partida = 1 // Por ahora hardcodeado a 1
 const parejas = ref([])
+const showPopup = ref(false)
+const mesaSeleccionada = ref(null)
+const resultadoExistente = ref(null)
+const mesasRegistradas = ref({})
 
 const mesasConParejas = computed(() => {
   const mesas = new Map()
@@ -71,14 +122,81 @@ const mesasConParejas = computed(() => {
 
 const cargarParejas = async () => {
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/1`)
+    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/${partida}`)
     if (response.ok) {
       parejas.value = await response.json()
+      await verificarMesasRegistradas()
     } else {
       console.error('Error al cargar las parejas')
     }
   } catch (error) {
     console.error('Error:', error)
+  }
+}
+
+const verificarMesasRegistradas = async () => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/v1/resultados/campeonato/${campeonatoId}/partida/${partida}`)
+    if (response.ok) {
+      const resultados = await response.json()
+      const mesasReg = {}
+      // Agrupamos por mesa y nos aseguramos de usar el número de mesa como clave
+      resultados.forEach(resultado => {
+        if (resultado && resultado.mesa) {
+          mesasReg[resultado.mesa] = true
+        }
+      })
+      console.log('Mesas registradas:', mesasReg, 'Mesas con parejas:', mesasConParejas.value) // Para depuración
+      mesasRegistradas.value = mesasReg
+    } else if (response.status === 404) {
+      mesasRegistradas.value = {}
+    } else {
+      console.error('Error al verificar mesas registradas')
+    }
+  } catch (error) {
+    console.error('Error al verificar mesas registradas:', error)
+    mesasRegistradas.value = {}
+  }
+}
+
+const cargarResultadoMesa = async (mesa) => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/v1/resultados/mesa/${campeonatoId}/${partida}/${mesa.numeroMesa}`)
+    if (response.ok) {
+      const resultados = await response.json()
+      if (resultados.length > 0) {
+        // Agrupar resultados por pareja
+        const puntos_pareja1 = resultados.find(r => r.jugador === 1)?.PT || 0
+        const puntos_pareja2 = resultados.find(r => r.jugador === 3)?.PT || 0
+        return { puntos_pareja1, puntos_pareja2 }
+      }
+    }
+  } catch (error) {
+    console.error('Error al cargar resultado de mesa:', error)
+  }
+  return null
+}
+
+const abrirRegistro = (mesa) => {
+  mesaSeleccionada.value = mesa
+  resultadoExistente.value = null
+  showPopup.value = true
+}
+
+const abrirModificacion = async (mesa) => {
+  mesaSeleccionada.value = mesa
+  resultadoExistente.value = await cargarResultadoMesa(mesa)
+  showPopup.value = true
+}
+
+const onResultadoGuardado = async () => {
+  try {
+    // Esperamos un momento para asegurar que los datos se han guardado en la BD
+    await new Promise(resolve => setTimeout(resolve, 200))
+    await verificarMesasRegistradas()
+    console.log('Estado actualizado después de guardar:', mesasRegistradas.value)
+  } catch (error) {
+    console.error('Error al actualizar estado después de guardar:', error)
   }
 }
 
@@ -91,7 +209,10 @@ onMounted(() => {
 .registro-mesas {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 20px 60px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
@@ -122,9 +243,10 @@ onMounted(() => {
   width: 100%;
   border: 1px solid #ddd;
   border-radius: 8px;
-  padding: 20px;
+  padding: 20px 40px;
   background-color: #fff;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
 }
 
 .mesa-header {
@@ -159,19 +281,14 @@ onMounted(() => {
 
 .pareja-info {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   background-color: white;
   padding: 12px 15px;
   border-radius: 4px;
   border: 1px solid #e0e0e0;
   width: calc(50% - 35px);
   margin: 0 15px;
-}
-
-.jugadores-info {
-  display: flex;
-  align-items: center;
-  margin-left: 10px;
+  overflow: hidden;
 }
 
 .pareja-label {
@@ -180,12 +297,6 @@ onMounted(() => {
   font-size: 1.1em;
   white-space: nowrap;
   margin-right: 8px;
-}
-
-.jugador {
-  font-size: 1em;
-  white-space: nowrap;
-  font-weight: 500;
 }
 
 .separator {
@@ -204,7 +315,7 @@ onMounted(() => {
   margin-top: 20px;
 }
 
-.btn-registrar, .btn-modificar {
+button {
   padding: 8px 16px;
   border-radius: 4px;
   border: none;
@@ -213,26 +324,49 @@ onMounted(() => {
   transition: background-color 0.3s;
 }
 
-.btn-registrar {
+.btn-primary {
   background-color: #4CAF50;
   color: white;
 }
 
-.btn-registrar:hover {
+.btn-primary:hover:not(:disabled) {
   background-color: #45a049;
 }
 
-.btn-modificar {
+.btn-secondary {
   background-color: #f0f0f0;
   color: #666;
 }
 
-.btn-modificar:disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
+.btn-secondary:hover:not(:disabled) {
+  background-color: #e0e0e0;
 }
 
-.btn-modificar:not(:disabled):hover {
-  background-color: #e0e0e0;
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background-color: #f0f0f0 !important;
+  color: #666 !important;
+}
+
+.jugadores {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+.jugador {
+  padding: 0.5rem;
+  background-color: white;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  font-size: 1em;
+  white-space: nowrap;
+}
+
+.jugador-separator {
+  color: #666;
+  font-weight: bold;
 }
 </style> 

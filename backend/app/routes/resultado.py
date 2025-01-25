@@ -5,7 +5,10 @@ from app.db.base import get_db
 from app.models.resultado import Resultado
 from app.schemas.resultado import ResultadoMesaInput, Resultado as ResultadoSchema
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/v1",
+    tags=["resultados"]
+)
 
 def calcular_PV(PT: int) -> int:
     """Calcula los Puntos Válidos (máximo 300)"""
@@ -97,4 +100,46 @@ def read_resultados_by_mesa(campeonato_id: int, partida: int, mesa: int, db: Ses
         Resultado.partida == partida,
         Resultado.mesa == mesa
     ).order_by(Resultado.jugador).all()
+    return resultados
+
+@router.put("/resultados/mesa/", response_model=List[ResultadoSchema])
+def update_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_db)):
+    """Actualiza los resultados existentes de una mesa"""
+    # Primero verificamos que existan los resultados
+    resultados = db.query(Resultado).filter(
+        Resultado.campeonato_id == datos.campeonato_id,
+        Resultado.partida == datos.partida,
+        Resultado.mesa == datos.mesa
+    ).all()
+    
+    if not resultados:
+        raise HTTPException(status_code=404, detail="No se encontraron resultados para actualizar")
+    
+    # Calcular los nuevos valores
+    PV_pareja1 = calcular_PV(datos.puntos_pareja1)
+    PV_pareja2 = calcular_PV(datos.puntos_pareja2)
+    
+    PC_pareja1 = PV_pareja1 - PV_pareja2
+    PC_pareja2 = PV_pareja2 - PV_pareja1
+    
+    PG_pareja1 = 1 if PC_pareja1 > 0 else 0
+    PG_pareja2 = 1 if PC_pareja2 > 0 else 0
+    
+    # Actualizar los resultados existentes
+    for resultado in resultados:
+        if resultado.jugador in [1, 2]:  # Pareja 1
+            resultado.PT = datos.puntos_pareja1
+            resultado.PV = PV_pareja1
+            resultado.PC = PC_pareja1
+            resultado.PG = PG_pareja1
+        else:  # Pareja 2
+            resultado.PT = datos.puntos_pareja2
+            resultado.PV = PV_pareja2
+            resultado.PC = PC_pareja2
+            resultado.PG = PG_pareja2
+    
+    db.commit()
+    for resultado in resultados:
+        db.refresh(resultado)
+    
     return resultados 
