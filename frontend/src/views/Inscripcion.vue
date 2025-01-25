@@ -1,10 +1,20 @@
 <template>
   <div class="inscripcion-container">
     <button 
-      :class="['btn-accion', inscripcionFinalizada ? 'btn-volver' : 'btn-finalizar']"
-      @click="inscripcionFinalizada ? volverAtras() : finalizarInscripcion()"
+      v-if="inscripcionFinalizada"
+      :class="['btn-accion', 'btn-volver']"
+      @click="volverAtras"
+      :disabled="hayResultados"
+      :title="hayResultados ? 'No se puede volver atrás porque hay resultados registrados' : 'Eliminar asignaciones y volver a la inscripción'"
     >
-      {{ inscripcionFinalizada ? 'Volver Atrás' : 'Finalizar Inscripción' }}
+      Volver Atrás
+    </button>
+    <button 
+      v-else
+      class="btn-accion btn-finalizar"
+      @click="finalizarInscripcion"
+    >
+      Finalizar Inscripción
     </button>
 
     <div v-if="!inscripcionFinalizada">
@@ -105,6 +115,7 @@ const campeonatoId = route.params.campeonatoId
 const jugadores = ref([])
 const nombreInput = ref(null)
 const inscripcionFinalizada = ref(false)
+const hayResultados = ref(false)
 
 const jugador = reactive({
   nombre: '',
@@ -254,7 +265,30 @@ const finalizarInscripcion = async () => {
   }
 }
 
+const verificarSorteoYResultados = async () => {
+  try {
+    // Verificar si existe el sorteo inicial
+    const responseSorteo = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/1`)
+    if (responseSorteo.ok) {
+      const parejas = await responseSorteo.json()
+      inscripcionFinalizada.value = parejas.length > 0
+    }
+
+    // Verificar si hay resultados
+    const responseResultados = await fetch(`http://localhost:8000/api/v1/resultados/campeonato/${campeonatoId}/partida/1`)
+    if (responseResultados.ok) {
+      const resultados = await responseResultados.json()
+      hayResultados.value = resultados.length > 0
+      console.log('Hay resultados:', hayResultados.value)
+    }
+  } catch (error) {
+    console.error('Error al verificar estado:', error)
+  }
+}
+
 const volverAtras = async () => {
+  if (hayResultados.value) return
+
   try {
     // Eliminar las asignaciones de parejas y mesas
     const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/eliminar/${campeonatoId}/1`, {
@@ -276,23 +310,10 @@ const volverAtras = async () => {
   }
 }
 
-const verificarSorteoExistente = async () => {
-  try {
-    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/1`)
-    if (response.ok) {
-      const parejas = await response.json()
-      inscripcionFinalizada.value = parejas.length > 0
-    }
-  } catch (error) {
-    console.error('Error al verificar sorteo:', error)
-  }
-}
-
-// Modificar onMounted para incluir la verificación
-onMounted(() => {
+onMounted(async () => {
+  await verificarSorteoYResultados()
   cargarJugadores()
   focusNombreInput()
-  verificarSorteoExistente()
 })
 </script>
 
@@ -331,6 +352,13 @@ onMounted(() => {
 
 .btn-volver:hover {
   background-color: #e76b00;
+}
+
+.btn-volver:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background-color: #f0f0f0 !important;
+  color: #666 !important;
 }
 
 .inscripcion-form {

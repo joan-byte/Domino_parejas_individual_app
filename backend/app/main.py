@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from app.core.config import settings
-from app.routes import mesa, resultado, pareja_partida, jugador, campeonato
+from app.routes import mesa, resultado, pareja_partida, jugador, campeonato, partida
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +38,7 @@ app.include_router(resultado.router)
 app.include_router(pareja_partida.router)
 app.include_router(jugador.router)
 app.include_router(campeonato.router)
+app.include_router(partida.router)
 logger.info("Todas las rutas han sido registradas")
 
 @app.get("/")

@@ -3,7 +3,7 @@
     <div class="header">
       <h2>Asignación de Mesas</h2>
       <div class="partida-info">
-        <span>Partida: 1</span>
+        <span>Partida: {{ partidaActual }}</span>
       </div>
     </div>
     
@@ -47,28 +47,44 @@ const campeonatoId = route.params.campeonatoId
 const parejas = ref([])
 const paginaActual = ref(0)
 const jugadoresPorPagina = 15
+const campeonatoSeleccionado = ref(null)
+const partidaActual = ref(1)
 let intervaloAutomatico = null
+
+const checkCampeonatoSeleccionado = () => {
+  const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+  if (campeonatoGuardado) {
+    campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
+    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 1
+  }
+}
 
 // Procesar los jugadores y sus mesas asignadas
 const jugadoresOrdenados = computed(() => {
+  if (!parejas.value || !Array.isArray(parejas.value)) {
+    return []
+  }
+
   const jugadores = []
   parejas.value.forEach(pareja => {
-    // Añadir jugador 1
-    jugadores.push({
-      id: pareja.jugador1_id,
-      nombre: pareja.jugador1.nombre,
-      apellidos: pareja.jugador1.apellidos,
-      club: pareja.jugador1.club,
-      mesa: pareja.mesa
-    })
-    // Añadir jugador 2
-    jugadores.push({
-      id: pareja.jugador2_id,
-      nombre: pareja.jugador2.nombre,
-      apellidos: pareja.jugador2.apellidos,
-      club: pareja.jugador2.club,
-      mesa: pareja.mesa
-    })
+    if (pareja.jugador1 && pareja.jugador2) {
+      // Añadir jugador 1
+      jugadores.push({
+        id: pareja.jugador1_id,
+        nombre: pareja.jugador1.nombre || '',
+        apellidos: pareja.jugador1.apellidos || '',
+        club: pareja.jugador1.club || '',
+        mesa: pareja.mesa
+      })
+      // Añadir jugador 2
+      jugadores.push({
+        id: pareja.jugador2_id,
+        nombre: pareja.jugador2.nombre || '',
+        apellidos: pareja.jugador2.apellidos || '',
+        club: pareja.jugador2.club || '',
+        mesa: pareja.mesa
+      })
+    }
   })
   // Ordenar por ID de jugador ascendente
   return jugadores.sort((a, b) => a.id - b.id)
@@ -106,18 +122,21 @@ const iniciarPaginacionAutomatica = () => {
 
 const cargarParejas = async () => {
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/1`)
+    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
     if (response.ok) {
-      parejas.value = await response.json()
+      const data = await response.json()
+      parejas.value = data
       // Iniciar paginación automática después de cargar los datos
       if (jugadoresOrdenados.value.length > jugadoresPorPagina) {
         iniciarPaginacionAutomatica()
       }
     } else {
-      console.error('Error al cargar las parejas')
+      console.error('Error al cargar las parejas:', response.statusText)
+      parejas.value = []
     }
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error al cargar las parejas:', error)
+    parejas.value = []
   }
 }
 
@@ -129,6 +148,7 @@ watch(() => jugadoresOrdenados.value.length, (newValue) => {
 })
 
 onMounted(() => {
+  checkCampeonatoSeleccionado()
   cargarParejas()
 })
 

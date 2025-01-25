@@ -215,13 +215,27 @@ const guardarResultados = async () => {
     })
     
     if (response.ok) {
-      emit('resultadoGuardado')
-      cerrar()
+      await onResultadoGuardado()
     } else {
       console.error('Error al guardar resultados')
     }
   } catch (error) {
     console.error('Error:', error)
+  }
+}
+
+const onResultadoGuardado = async () => {
+  try {
+    // Esperar un momento para asegurar que los datos se han guardado
+    await new Promise(resolve => setTimeout(resolve, 200))
+    
+    // Disparar evento para actualizar el ranking
+    window.dispatchEvent(new Event('ranking-update'))
+    
+    // Cerrar el popup
+    emit('close')
+  } catch (error) {
+    console.error('Error al procesar el guardado:', error)
   }
 }
 

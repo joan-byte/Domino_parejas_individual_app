@@ -19,5 +19,5 @@ class Resultado(Base):
     campeonato_id = Column(Integer, ForeignKey("campeonatos.id"))
     
     # Relaciones
-    jugador_rel = relationship("Jugador")
+    jugador_data = relationship("Jugador", backref="resultados")
     campeonato = relationship("Campeonato") 

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.db.base import get_db
 from app.models.resultado import Resultado
+from app.models.jugador import Jugador
 from app.schemas.resultado import ResultadoMesaInput, Resultado as ResultadoSchema
+from sqlalchemy.sql import func
 
 router = APIRouter(
     prefix="/api/v1",
@@ -77,10 +79,13 @@ def read_resultados(skip: int = 0, limit: int = 100, db: Session = Depends(get_d
 @router.get("/resultados/campeonato/{campeonato_id}/partida/{partida}", response_model=List[ResultadoSchema])
 def read_resultados_by_campeonato_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
     """Obtiene todos los resultados de una partida en un campeonato"""
-    resultados = db.query(Resultado).filter(
+    resultados = db.query(Resultado).join(
+        Jugador, Resultado.jugador_id == Jugador.id
+    ).filter(
         Resultado.campeonato_id == campeonato_id,
         Resultado.partida == partida
     ).order_by(Resultado.mesa, Resultado.jugador).all()
+    
     return resultados
 
 @router.get("/resultados/jugador/{jugador_id}/campeonato/{campeonato_id}", response_model=List[ResultadoSchema])
@@ -142,4 +147,61 @@ def update_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
     for resultado in resultados:
         db.refresh(resultado)
     
+    return resultados
+
+@router.get("/ranking/campeonato/{campeonato_id}")
+async def get_ranking_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
+    """Obtiene el ranking de jugadores de un campeonato"""
+    
+    # Obtener todos los resultados del campeonato
+    ranking = db.query(
+        Resultado.jugador_id,
+        Jugador.nombre,
+        Jugador.apellidos,
+        Jugador.club,
+        func.sum(Resultado.PT).label('PT'),
+        func.sum(Resultado.PG).label('PG'),
+        func.sum(Resultado.PC).label('PC'),
+        func.max(Resultado.partida).label('ultima_partida')
+    ).join(
+        Jugador, Resultado.jugador_id == Jugador.id
+    ).filter(
+        Resultado.campeonato_id == campeonato_id
+    ).group_by(
+        Resultado.jugador_id,
+        Jugador.nombre,
+        Jugador.apellidos,
+        Jugador.club
+    ).order_by(
+        func.sum(Resultado.PG).desc(),
+        func.sum(Resultado.PC).desc(),
+        func.sum(Resultado.PT).desc()
+    ).all()
+    
+    if not ranking:
+        raise HTTPException(status_code=404, detail="No se encontraron resultados para este campeonato")
+    
+    # Convertir los resultados a un formato más amigable
+    ranking_list = []
+    for r in ranking:
+        ranking_list.append({
+            "jugador_id": r.jugador_id,
+            "nombre": r.nombre,
+            "apellidos": r.apellidos,
+            "club": r.club,
+            "PT": int(r.PT),
+            "PG": int(r.PG),
+            "PC": int(r.PC),
+            "ultima_partida": int(r.ultima_partida)
+        })
+    
+    return ranking_list
+
+@router.get("/resultados/campeonato/{campeonato_id}/hasta-partida/{partida}", response_model=List[ResultadoSchema])
+def read_resultados_hasta_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Obtiene todos los resultados de un campeonato hasta una partida específica"""
+    resultados = db.query(Resultado).filter(
+        Resultado.campeonato_id == campeonato_id,
+        Resultado.partida <= partida
+    ).order_by(Resultado.partida, Resultado.mesa, Resultado.jugador).all()
     return resultados 

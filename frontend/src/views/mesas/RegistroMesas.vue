@@ -2,8 +2,18 @@
   <div class="registro-mesas">
     <div class="header">
       <h2>Registro de Mesas</h2>
-      <div class="partida-info">
-        <span>Partida: {{ partida }}</span>
+      <div class="header-right">
+        <button 
+          class="btn-cerrar-partida" 
+          :disabled="!todasMesasRegistradas"
+          :title="!todasMesasRegistradas ? 'Todas las mesas deben tener resultados registrados' : 'Cerrar la partida actual'"
+          @click="cerrarPartida"
+        >
+          CERRAR PARTIDA
+        </button>
+        <div class="partida-info">
+          <span>Partida: {{ partidaActual }}</span>
+        </div>
       </div>
     </div>
     
@@ -76,7 +86,7 @@
       v-model:show="showPopup"
       :mesa="mesaSeleccionada"
       :campeonato-id="campeonatoId"
-      :partida="partida"
+      :partida="partidaActual"
       :resultado-existente="resultadoExistente"
       @resultado-guardado="onResultadoGuardado"
     />
@@ -85,83 +95,124 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ResultadoMesaPopup from '@/components/ResultadoMesaPopup.vue'
 
 const route = useRoute()
+const router = useRouter()
 const campeonatoId = parseInt(route.params.campeonatoId)
-const partida = 1 // Por ahora hardcodeado a 1
-const parejas = ref([])
+const mesas = ref([])
+const campeonatoSeleccionado = ref(null)
+const partidaActual = ref(1)
+const mesasRegistradas = ref({})
 const showPopup = ref(false)
 const mesaSeleccionada = ref(null)
 const resultadoExistente = ref(null)
-const mesasRegistradas = ref({})
 
-const mesasConParejas = computed(() => {
-  const mesas = new Map()
-  
-  parejas.value.forEach(pareja => {
-    if (!mesas.has(pareja.mesa)) {
-      mesas.set(pareja.mesa, {
-        numeroMesa: pareja.mesa,
-        pareja1: null,
-        pareja2: null
-      })
-    }
-    
-    const mesaActual = mesas.get(pareja.mesa)
-    if (!mesaActual.pareja1) {
-      mesaActual.pareja1 = pareja
-    } else {
-      mesaActual.pareja2 = pareja
-    }
-  })
-  
-  return Array.from(mesas.values())
-})
+const checkCampeonatoSeleccionado = () => {
+  const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+  if (campeonatoGuardado) {
+    campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
+    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 1
+    console.log('Partida actual:', partidaActual.value)
+  }
+}
 
-const cargarParejas = async () => {
+const cargarMesas = async () => {
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/${partida}`)
+    console.log('Cargando mesas para partida:', partidaActual.value)
+    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
     if (response.ok) {
-      parejas.value = await response.json()
+      const parejas = await response.json()
+      console.log('Parejas recibidas:', parejas)
+      
+      // Agrupar parejas por mesa
+      const mesasTemp = []
+      const mesasProcesadas = new Set()
+      
+      parejas.forEach(pareja => {
+        if (!mesasProcesadas.has(pareja.mesa)) {
+          const pareja1 = parejas.find(p => p.mesa === pareja.mesa && p.numero_pareja === 1)
+          const pareja2 = parejas.find(p => p.mesa === pareja.mesa && p.numero_pareja === 2)
+          
+          if (pareja1 && pareja2) {
+            mesasTemp.push({
+              numeroMesa: pareja.mesa,
+              pareja1,
+              pareja2
+            })
+            mesasProcesadas.add(pareja.mesa)
+          }
+        }
+      })
+      
+      console.log('Mesas procesadas:', mesasTemp)
+      mesas.value = mesasTemp
       await verificarMesasRegistradas()
     } else {
-      console.error('Error al cargar las parejas')
+      console.error('Error al cargar las mesas:', response.statusText)
+      mesas.value = []
+    }
+  } catch (error) {
+    console.error('Error al cargar las mesas:', error)
+    mesas.value = []
+  }
+}
+
+const verificarMesasRegistradas = async () => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/v1/resultados/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    if (response.ok) {
+      const resultados = await response.json()
+      // Agrupar resultados por mesa
+      const mesasReg = {}
+      resultados.forEach(resultado => {
+        mesasReg[resultado.mesa] = true
+      })
+      mesasRegistradas.value = mesasReg
     }
   } catch (error) {
     console.error('Error:', error)
   }
 }
 
-const verificarMesasRegistradas = async () => {
-  try {
-    const response = await fetch(`http://localhost:8000/api/v1/resultados/campeonato/${campeonatoId}/partida/${partida}`)
-    if (response.ok) {
-      const resultados = await response.json()
-      const mesasReg = {}
-      // Agrupamos por mesa y nos aseguramos de usar el número de mesa como clave
-      resultados.forEach(resultado => {
-        if (resultado && resultado.mesa) {
-          mesasReg[resultado.mesa] = true
-        }
-      })
-      console.log('Mesas registradas:', mesasReg, 'Mesas con parejas:', mesasConParejas.value) // Para depuración
-      mesasRegistradas.value = mesasReg
-    } else if (response.status === 404) {
-      mesasRegistradas.value = {}
-    } else {
-      console.error('Error al verificar mesas registradas')
-    }
-  } catch (error) {
-    console.error('Error al verificar mesas registradas:', error)
-    mesasRegistradas.value = {}
+const mesasConParejas = computed(() => {
+  if (!mesas.value || !Array.isArray(mesas.value)) {
+    return []
   }
-}
+  
+  const mesasMap = new Map()
+  
+  mesas.value.forEach(mesa => {
+    if (!mesasMap.has(mesa.numeroMesa)) {
+      mesasMap.set(mesa.numeroMesa, {
+        numeroMesa: mesa.numeroMesa,
+        pareja1: mesa.pareja1,
+        pareja2: mesa.pareja2
+      })
+    }
+  })
+  
+  return Array.from(mesasMap.values())
+})
+
+const todasMesasRegistradas = computed(() => {
+  if (!mesasConParejas.value.length) return false
+  
+  // Verificar que todas las mesas tienen resultados registrados
+  const todasRegistradas = mesasConParejas.value.every(mesa => {
+    const tieneResultado = mesasRegistradas.value[mesa.numeroMesa] === true
+    console.log(`Mesa ${mesa.numeroMesa}: ${tieneResultado ? 'tiene resultado' : 'no tiene resultado'}`)
+    return tieneResultado
+  })
+  
+  console.log('¿Todas las mesas registradas?:', todasRegistradas)
+  return todasRegistradas
+})
 
 const cargarResultadoMesa = async (mesa) => {
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/resultados/mesa/${campeonatoId}/${partida}/${mesa.numeroMesa}`)
+    const response = await fetch(`http://localhost:8000/api/v1/resultados/mesa/${campeonatoId}/${partidaActual.value}/${mesa.numeroMesa}`)
     if (response.ok) {
       const resultados = await response.json()
       if (resultados.length > 0) {
@@ -200,8 +251,98 @@ const onResultadoGuardado = async () => {
   }
 }
 
+const cerrarPartida = async () => {
+  if (!todasMesasRegistradas.value) return
+
+  try {
+    // 1. Cerrar la partida actual
+    const responseCierre = await fetch(`http://localhost:8000/api/v1/partidas/cerrar/${campeonatoId}/${partidaActual.value}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+
+    if (!responseCierre.ok) {
+      throw new Error('Error al cerrar la partida')
+    }
+
+    // 2. Obtener el ranking actualizado
+    const responseRanking = await fetch(`http://localhost:8000/api/v1/ranking/campeonato/${campeonatoId}`)
+    if (!responseRanking.ok) {
+      throw new Error('Error al obtener el ranking')
+    }
+    const ranking = await responseRanking.json()
+
+    // 3. Crear las nuevas parejas según el ranking
+    const nuevaPartida = partidaActual.value + 1
+    const parejasPorRanking = []
+    
+    // Ordenar jugadores por ranking (PT descendente)
+    const jugadoresOrdenados = ranking.sort((a, b) => b.PT - a.PT)
+    
+    // Crear parejas según el patrón: (1,3), (2,4), (5,7), (6,8), etc.
+    for (let i = 0; i < jugadoresOrdenados.length; i += 4) {
+      const mesa = Math.floor(i / 4) + 1
+      
+      // Pareja 1: jugador ranking 1 y 3 de cada grupo de 4
+      if (i + 2 < jugadoresOrdenados.length) {
+        parejasPorRanking.push({
+          mesa: mesa,
+          jugador1_id: jugadoresOrdenados[i].jugador_id,
+          jugador2_id: jugadoresOrdenados[i + 2].jugador_id,
+          partida: nuevaPartida
+        })
+      }
+      
+      // Pareja 2: jugador ranking 2 y 4 de cada grupo de 4
+      if (i + 3 < jugadoresOrdenados.length) {
+        parejasPorRanking.push({
+          mesa: mesa,
+          jugador1_id: jugadoresOrdenados[i + 1].jugador_id,
+          jugador2_id: jugadoresOrdenados[i + 3].jugador_id,
+          partida: nuevaPartida
+        })
+      }
+    }
+
+    // 4. Guardar las nuevas parejas
+    const responseNuevasParejas = await fetch(`http://localhost:8000/api/v1/parejas-partida/asignar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        campeonato_id: campeonatoId,
+        partida: nuevaPartida,
+        parejas: parejasPorRanking
+      })
+    })
+
+    if (!responseNuevasParejas.ok) {
+      throw new Error('Error al asignar nuevas parejas')
+    }
+
+    // 5. Actualizar el localStorage con la nueva partida
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    if (campeonatoGuardado) {
+      const campeonato = JSON.parse(campeonatoGuardado)
+      campeonato.partida_actual = nuevaPartida
+      localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+    }
+
+    alert('Partida cerrada y nuevas parejas asignadas correctamente')
+    // 6. Redirigir a la página de asignación de mesas para la siguiente partida
+    router.push(`/mesas/asignacion/${campeonatoId}`)
+  } catch (error) {
+    console.error('Error:', error)
+    alert('Error al cerrar la partida: ' + error.message)
+  }
+}
+
 onMounted(() => {
-  cargarParejas()
+  checkCampeonatoSeleccionado()
+  cargarMesas()
 })
 </script>
 
@@ -226,10 +367,43 @@ onMounted(() => {
   margin: 0;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
 .partida-info {
   font-size: 1.2em;
   font-weight: bold;
   color: #4CAF50;
+}
+
+.btn-cerrar-partida {
+  background-color: #4CAF50;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 1.1em;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+.btn-cerrar-partida:hover:not(:disabled) {
+  background-color: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.btn-cerrar-partida:disabled {
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .mesas-grid {

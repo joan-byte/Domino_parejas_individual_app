@@ -7,11 +7,24 @@ from app.db.base import get_db
 from app.models.pareja_partida import ParejaPartida
 from app.models.resultado import Resultado
 from app.schemas.pareja_partida import ParejaPartidaCreate, ParejaPartida as ParejaPartidaSchema, SorteoInicial
+from pydantic import BaseModel
+from typing import List
 
 router = APIRouter(
     prefix="/api/v1",
     tags=["parejas-partida"]
 )
+
+class ParejaNueva(BaseModel):
+    mesa: int
+    jugador1_id: int
+    jugador2_id: int
+    partida: int
+
+class AsignacionParejas(BaseModel):
+    campeonato_id: int
+    partida: int
+    parejas: List[ParejaNueva]
 
 @router.post("/parejas-partida/sorteo-inicial/", response_model=List[ParejaPartidaSchema])
 def crear_parejas_sorteo_inicial(datos: SorteoInicial, db: Session = Depends(get_db)):
@@ -162,4 +175,39 @@ def eliminar_parejas_partida(campeonato_id: int, partida: int, db: Session = Dep
         db.delete(pareja)
     
     db.commit()
-    return {"message": "Parejas eliminadas correctamente"} 
+    return {"message": "Parejas eliminadas correctamente"}
+
+@router.post("/parejas-partida/asignar", response_model=List[ParejaPartidaSchema])
+def asignar_parejas(datos: AsignacionParejas, db: Session = Depends(get_db)):
+    """Asigna las parejas para una partida"""
+    try:
+        nuevas_parejas = []
+        # Agrupar parejas por mesa
+        parejas_por_mesa = {}
+        for pareja in datos.parejas:
+            if pareja.mesa not in parejas_por_mesa:
+                parejas_por_mesa[pareja.mesa] = []
+            parejas_por_mesa[pareja.mesa].append(pareja)
+        
+        # Crear las parejas asignando el número correcto
+        for mesa, parejas in parejas_por_mesa.items():
+            for i, pareja in enumerate(parejas, 1):
+                nueva_pareja = ParejaPartida(
+                    partida=pareja.partida,
+                    mesa=pareja.mesa,
+                    jugador1_id=pareja.jugador1_id,
+                    jugador2_id=pareja.jugador2_id,
+                    numero_pareja=i,  # 1 para la primera pareja, 2 para la segunda
+                    campeonato_id=datos.campeonato_id
+                )
+                db.add(nueva_pareja)
+                nuevas_parejas.append(nueva_pareja)
+        
+        db.commit()
+        for pareja in nuevas_parejas:
+            db.refresh(pareja)
+        
+        return nuevas_parejas
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al asignar parejas: {str(e)}") 
