@@ -44,12 +44,12 @@
         </div>
       </div>
     </nav>
-    <router-view></router-view>
+    <router-view :key="$route.fullPath"></router-view>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 interface Campeonato {
   id: number
@@ -71,11 +71,19 @@ const checkCampeonatoSeleccionado = (): void => {
 const limpiarCampeonato = (): void => {
   localStorage.removeItem('campeonatoSeleccionado')
   campeonatoSeleccionado.value = null
+  // Disparar el evento storage para que Home.vue se actualice
+  window.dispatchEvent(new Event('storage'))
 }
 
 onMounted(() => {
   checkCampeonatoSeleccionado()
-  window.addEventListener('storage', checkCampeonatoSeleccionado)
+  window.addEventListener('storage', () => {
+    checkCampeonatoSeleccionado()
+  })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', checkCampeonatoSeleccionado)
 })
 </script>
 

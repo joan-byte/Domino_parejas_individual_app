@@ -1,30 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
 from sqlalchemy import func
+from typing import List
 import random
 from app.db.base import get_db
 from app.models.pareja_partida import ParejaPartida
 from app.models.resultado import Resultado
-from app.schemas.pareja_partida import ParejaPartidaCreate, ParejaPartida as ParejaPartidaSchema, SorteoInicial
-from pydantic import BaseModel
-from typing import List
+from app.schemas.pareja_partida import (
+    ParejaPartidaCreate,
+    ParejaPartida as ParejaPartidaSchema,
+    SorteoInicial,
+    AsignacionParejas,
+    ParejaNueva
+)
 
 router = APIRouter(
     prefix="/api/v1",
     tags=["parejas-partida"]
 )
-
-class ParejaNueva(BaseModel):
-    mesa: int
-    jugador1_id: int
-    jugador2_id: int
-    partida: int
-
-class AsignacionParejas(BaseModel):
-    campeonato_id: int
-    partida: int
-    parejas: List[ParejaNueva]
 
 @router.post("/parejas-partida/sorteo-inicial/", response_model=List[ParejaPartidaSchema])
 def crear_parejas_sorteo_inicial(datos: SorteoInicial, db: Session = Depends(get_db)):
@@ -210,4 +203,29 @@ def asignar_parejas(datos: AsignacionParejas, db: Session = Depends(get_db)):
         return nuevas_parejas
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al asignar parejas: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error al asignar parejas: {str(e)}")
+
+@router.get("/parejas-partida/ultima-partida/{campeonato_id}")
+def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
+    """Obtiene el número de la última partida registrada para un campeonato"""
+    try:
+        # Primero verificar si existen registros para este campeonato
+        existe_registro = db.query(ParejaPartida).filter(
+            ParejaPartida.campeonato_id == campeonato_id
+        ).first()
+        
+        if not existe_registro:
+            return {"ultima_partida": "No hay registros", "tiene_registros": False}
+            
+        ultima_partida = db.query(func.max(ParejaPartida.partida)).filter(
+            ParejaPartida.campeonato_id == campeonato_id
+        ).scalar()
+        
+        print(f"Última partida para campeonato {campeonato_id}: {ultima_partida}")
+        return {
+            "ultima_partida": ultima_partida if ultima_partida is not None else 1,
+            "tiene_registros": True
+        }
+    except Exception as e:
+        print(f"Error al obtener última partida: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) 

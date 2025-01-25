@@ -1,6 +1,17 @@
 from pydantic import BaseModel
-from typing import List
-from .jugador import JugadorBase
+from typing import List, Optional
+from .jugador import Jugador
+
+class ParejaNueva(BaseModel):
+    mesa: int
+    jugador1_id: int
+    jugador2_id: int
+    partida: int
+
+class AsignacionParejas(BaseModel):
+    campeonato_id: int
+    partida: int
+    parejas: List[ParejaNueva]
 
 class ParejaPartidaBase(BaseModel):
     partida: int
@@ -15,8 +26,8 @@ class ParejaPartidaCreate(ParejaPartidaBase):
 
 class ParejaPartida(ParejaPartidaBase):
     id: int
-    jugador1: JugadorBase
-    jugador2: JugadorBase
+    jugador1: Optional[Jugador] = None
+    jugador2: Optional[Jugador] = None
 
     class Config:
         from_attributes = True

@@ -1,9 +1,10 @@
 <template>
   <div class="home">
-    <h1>Campeonato de Parejas Individual</h1>
+    <div class="header">
+      <h1>Dominó por Parejas Individual</h1>
+    </div>
     
     <div class="campeonatos-list" v-if="campeonatos.length > 0">
-      <h2>Campeonatos Activos</h2>
       <div class="campeonatos-grid">
         <div 
           v-for="campeonato in campeonatos" 
@@ -44,11 +45,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 
 const router = useRouter()
+const route = useRoute()
 const campeonatos = ref([])
 const campeonatoSeleccionado = ref(null)
 
@@ -57,36 +59,28 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('es-ES', options)
 }
 
+// Función para verificar el estado de selección
+const verificarSeleccion = () => {
+  if (route.path === '/') {
+    campeonatoSeleccionado.value = null
+  } else {
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    if (campeonatoGuardado) {
+      campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
+    }
+  }
+}
+
 const seleccionarCampeonato = (campeonato) => {
-  campeonatoSeleccionado.value = campeonato
-  localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
-  // Disparar el evento storage para que App.vue detecte el cambio
-  window.dispatchEvent(new Event('storage'))
+  if (route.path === '/') {
+    campeonatoSeleccionado.value = campeonato
+    localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+    window.dispatchEvent(new Event('storage'))
+  }
 }
 
 const modificarCampeonato = (id) => {
   router.push(`/modificar-campeonato/${id}`)
-}
-
-const cargarCampeonatos = async () => {
-  try {
-    const response = await axios.get('http://localhost:8000/api/campeonatos/')
-    campeonatos.value = response.data
-    
-    // Recuperar campeonato seleccionado del localStorage
-    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
-    if (campeonatoGuardado) {
-      const campeonato = JSON.parse(campeonatoGuardado)
-      // Verificar si el campeonato aún existe en la lista
-      if (campeonatos.value.some(c => c.id === campeonato.id)) {
-        campeonatoSeleccionado.value = campeonato
-      } else {
-        localStorage.removeItem('campeonatoSeleccionado')
-      }
-    }
-  } catch (error) {
-    console.error('Error al cargar los campeonatos:', error)
-  }
 }
 
 const eliminarCampeonato = async (id) => {
@@ -106,8 +100,79 @@ const eliminarCampeonato = async (id) => {
   }
 }
 
-onMounted(() => {
-  cargarCampeonatos()
+// Función para actualizar un campeonato específico
+const actualizarCampeonatoEnLista = (campeonatoId, nuevaPartida) => {
+  const campeonato = campeonatos.value.find(c => c.id === campeonatoId)
+  if (campeonato) {
+    campeonato.partida_actual = nuevaPartida
+  }
+}
+
+const actualizarPartidaActual = () => {
+  const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+  if (campeonatoGuardado) {
+    const campeonato = JSON.parse(campeonatoGuardado)
+    campeonatoSeleccionado.value = campeonato
+    // Actualizar también en la lista de campeonatos
+    actualizarCampeonatoEnLista(campeonato.id, campeonato.partida_actual)
+  }
+}
+
+// Actualizar cuando cambie el localStorage
+window.addEventListener('storage', () => {
+  if (route.path === '/') {
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    campeonatoSeleccionado.value = campeonatoGuardado ? JSON.parse(campeonatoGuardado) : null
+  }
+})
+
+// Limpiar selección cuando se navega a la página de inicio
+watch(() => route.path, async (newPath) => {
+  if (newPath === '/') {
+    campeonatoSeleccionado.value = null
+    localStorage.removeItem('campeonatoSeleccionado')
+    await cargarCampeonatos()
+  }
+})
+
+const cargarCampeonatos = async () => {
+  try {
+    const responseCampeonatos = await axios.get('http://localhost:8000/api/campeonatos/')
+    const campeonatosData = responseCampeonatos.data
+
+    for (const campeonato of campeonatosData) {
+      try {
+        const responsePartidas = await axios.get(`http://localhost:8000/api/v1/parejas-partida/ultima-partida/${campeonato.id}`)
+        if (responsePartidas.data.tiene_registros) {
+          campeonato.partida_actual = responsePartidas.data.ultima_partida
+        } else {
+          campeonato.partida_actual = "No hay registros"
+        }
+      } catch (error) {
+        console.error(`Error al obtener la última partida del campeonato ${campeonato.id}:`, error)
+        campeonato.partida_actual = "Error al obtener partida"
+      }
+    }
+
+    campeonatos.value = campeonatosData
+    // Verificar si hay un campeonato seleccionado después de cargar los datos
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    if (campeonatoGuardado && route.path === '/') {
+      campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
+    }
+  } catch (error) {
+    console.error('Error al cargar los campeonatos:', error)
+  }
+}
+
+onMounted(async () => {
+  if (route.path === '/') {
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    if (campeonatoGuardado) {
+      campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
+    }
+  }
+  await cargarCampeonatos()
 })
 </script>
 
@@ -129,6 +194,26 @@ h2 {
   margin: 2rem 0 1rem;
 }
 
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.partida-info {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #4CAF50;
+  padding: 0.5rem 1rem;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
 .campeonatos-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -143,6 +228,7 @@ h2 {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: all 0.3s ease;
+  border: 2px solid transparent;
 }
 
 .campeonato-card:hover {
@@ -151,8 +237,8 @@ h2 {
 }
 
 .campeonato-card.selected {
-  border: 2px solid #3498db;
-  background-color: #f7f9fc;
+  border-color: #3498db !important;
+  background-color: #f7f9fc !important;
 }
 
 .campeonato-card h3 {
