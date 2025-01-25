@@ -6,7 +6,7 @@ from app.models.pareja_partida import ParejaPartida
 from sqlalchemy import func
 
 router = APIRouter(
-    prefix="/api/v1",
+    prefix="/api",
     tags=["partidas"]
 )
 

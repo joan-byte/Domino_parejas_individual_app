@@ -8,7 +8,6 @@ from app.schemas.resultado import ResultadoMesaInput, Resultado as ResultadoSche
 from sqlalchemy.sql import func
 
 router = APIRouter(
-    prefix="/api/v1",
     tags=["resultados"]
 )
 
@@ -153,7 +152,7 @@ def update_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
 async def get_ranking_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
     """Obtiene el ranking de jugadores de un campeonato"""
     
-    # Obtener todos los resultados del campeonato
+    # Obtener todos los resultados del campeonato solo para jugadores activos
     ranking = db.query(
         Resultado.jugador_id,
         Jugador.nombre,
@@ -166,7 +165,8 @@ async def get_ranking_campeonato(campeonato_id: int, db: Session = Depends(get_d
     ).join(
         Jugador, Resultado.jugador_id == Jugador.id
     ).filter(
-        Resultado.campeonato_id == campeonato_id
+        Resultado.campeonato_id == campeonato_id,
+        Jugador.activo == True  # Filtrar solo jugadores activos
     ).group_by(
         Resultado.jugador_id,
         Jugador.nombre,

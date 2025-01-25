@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 from app.core.config import settings
 from app.routes import mesa, resultado, pareja_partida, jugador, campeonato, partida
+from fastapi import APIRouter
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -33,12 +34,21 @@ app.add_middleware(
 
 # Registrar las rutas
 logger.info("Registrando rutas de la API...")
-app.include_router(mesa.router)
-app.include_router(resultado.router)
-app.include_router(pareja_partida.router)
-app.include_router(jugador.router)
-app.include_router(campeonato.router)
-app.include_router(partida.router)
+
+# Crear el router principal con prefijo /api
+api_router = APIRouter(prefix="/api")
+
+# Incluir los sub-routers
+api_router.include_router(mesa.router)
+api_router.include_router(resultado.router)
+api_router.include_router(pareja_partida.router)
+api_router.include_router(jugador.router)
+api_router.include_router(campeonato.router)
+api_router.include_router(partida.router)
+
+# Incluir el router principal en la aplicación
+app.include_router(api_router)
+
 logger.info("Todas las rutas han sido registradas")
 
 @app.get("/")

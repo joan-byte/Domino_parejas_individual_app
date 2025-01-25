@@ -241,7 +241,7 @@ const finalizarInscripcion = async () => {
 
   try {
     // Realizar el sorteo inicial
-    const response = await fetch('http://localhost:8000/api/v1/parejas-partida/sorteo-inicial/', {
+    const response = await fetch('http://localhost:8000/api/parejas-partida/sorteo-inicial/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -268,14 +268,14 @@ const finalizarInscripcion = async () => {
 const verificarSorteoYResultados = async () => {
   try {
     // Verificar si existe el sorteo inicial
-    const responseSorteo = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/1`)
+    const responseSorteo = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/1`)
     if (responseSorteo.ok) {
       const parejas = await responseSorteo.json()
       inscripcionFinalizada.value = parejas.length > 0
     }
 
     // Verificar si hay resultados
-    const responseResultados = await fetch(`http://localhost:8000/api/v1/resultados/campeonato/${campeonatoId}/partida/1`)
+    const responseResultados = await fetch(`http://localhost:8000/api/resultados/campeonato/${campeonatoId}/partida/1`)
     if (responseResultados.ok) {
       const resultados = await responseResultados.json()
       hayResultados.value = resultados.length > 0
@@ -291,7 +291,7 @@ const volverAtras = async () => {
 
   try {
     // Eliminar las asignaciones de parejas y mesas
-    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/eliminar/${campeonatoId}/1`, {
+    const response = await fetch(`http://localhost:8000/api/parejas-partida/eliminar/${campeonatoId}/1`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

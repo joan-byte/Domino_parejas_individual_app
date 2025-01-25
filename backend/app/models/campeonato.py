@@ -12,6 +12,7 @@ class Campeonato(Base):
     numero_partidas = Column(Integer, nullable=False)
     activo = Column(Boolean, default=True)
     partida_actual = Column(Integer, default=0)
+    finalizado = Column(Boolean, default=False)
     
     # Relaciones
     jugadores = relationship("Jugador", back_populates="campeonato")

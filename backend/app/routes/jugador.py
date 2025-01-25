@@ -7,7 +7,7 @@ from app.models.jugador import Jugador
 from app.schemas.jugador import JugadorCreate, JugadorResponse, JugadorUpdate
 
 router = APIRouter(
-    prefix="/api/jugadores",
+    prefix="/jugadores",
     tags=["jugadores"]
 )
 

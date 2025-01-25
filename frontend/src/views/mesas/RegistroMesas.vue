@@ -9,7 +9,7 @@
           :title="!todasMesasRegistradas ? 'Todas las mesas deben tener resultados registrados' : 'Cerrar la partida actual'"
           @click="cerrarPartida"
         >
-          CERRAR PARTIDA
+          {{ textoCerrarPartida }}
         </button>
         <div class="partida-info">
           <span>Partida: {{ partidaActual }}</span>
@@ -108,6 +108,14 @@ const mesasRegistradas = ref({})
 const showPopup = ref(false)
 const mesaSeleccionada = ref(null)
 const resultadoExistente = ref(null)
+const esUltimaPartida = computed(() => {
+  return campeonatoSeleccionado.value && 
+         partidaActual.value === campeonatoSeleccionado.value.numero_partidas
+})
+
+const textoCerrarPartida = computed(() => {
+  return esUltimaPartida.value ? 'Cerrar Campeonato' : 'Cerrar Partida'
+})
 
 const checkCampeonatoSeleccionado = () => {
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
@@ -121,7 +129,7 @@ const checkCampeonatoSeleccionado = () => {
 const cargarMesas = async () => {
   try {
     console.log('Cargando mesas para partida:', partidaActual.value)
-    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    const response = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
     if (response.ok) {
       const parejas = await response.json()
       console.log('Parejas recibidas:', parejas)
@@ -161,7 +169,7 @@ const cargarMesas = async () => {
 
 const verificarMesasRegistradas = async () => {
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/resultados/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    const response = await fetch(`http://localhost:8000/api/resultados/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
     if (response.ok) {
       const resultados = await response.json()
       // Agrupar resultados por mesa
@@ -212,7 +220,7 @@ const todasMesasRegistradas = computed(() => {
 
 const cargarResultadoMesa = async (mesa) => {
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/resultados/mesa/${campeonatoId}/${partidaActual.value}/${mesa.numeroMesa}`)
+    const response = await fetch(`http://localhost:8000/api/resultados/mesa/${campeonatoId}/${partidaActual.value}/${mesa.numeroMesa}`)
     if (response.ok) {
       const resultados = await response.json()
       if (resultados.length > 0) {
@@ -256,7 +264,7 @@ const cerrarPartida = async () => {
 
   try {
     // 1. Cerrar la partida actual
-    const responseCierre = await fetch(`http://localhost:8000/api/v1/partidas/cerrar/${campeonatoId}/${partidaActual.value}`, {
+    const responseCierre = await fetch(`http://localhost:8000/api/partidas/cerrar/${campeonatoId}/${partidaActual.value}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -267,8 +275,26 @@ const cerrarPartida = async () => {
       throw new Error('Error al cerrar la partida')
     }
 
+    // Si es la última partida, finalizar el campeonato
+    if (esUltimaPartida.value) {
+      const responseFinalizar = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}/finalizar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (!responseFinalizar.ok) {
+        throw new Error('Error al finalizar el campeonato')
+      }
+
+      alert('Campeonato finalizado correctamente')
+      router.push('/')
+      return
+    }
+
     // 2. Obtener el ranking actualizado
-    const responseRanking = await fetch(`http://localhost:8000/api/v1/ranking/campeonato/${campeonatoId}`)
+    const responseRanking = await fetch(`http://localhost:8000/api/ranking/campeonato/${campeonatoId}`)
     if (!responseRanking.ok) {
       throw new Error('Error al obtener el ranking')
     }
@@ -307,7 +333,7 @@ const cerrarPartida = async () => {
     }
 
     // 4. Guardar las nuevas parejas
-    const responseNuevasParejas = await fetch(`http://localhost:8000/api/v1/parejas-partida/asignar`, {
+    const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/asignar`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

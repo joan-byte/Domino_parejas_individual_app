@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Crear el router con configuración explícita
 router = APIRouter(
-    prefix="/api/campeonatos",
+    prefix="/campeonatos",
     tags=["campeonatos"]
 )
 
@@ -87,4 +87,17 @@ async def delete_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
     db.delete(db_campeonato)
     db.commit()
     logger.info(f"Campeonato {campeonato_id} eliminado")
-    return {"message": "Campeonato eliminado"} 
+    return {"message": "Campeonato eliminado"}
+
+@router.post("/campeonatos/{campeonato_id}/finalizar")
+def finalizar_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
+    """Finaliza un campeonato"""
+    campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+    if not campeonato:
+        raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+    
+    campeonato.finalizado = True
+    db.commit()
+    db.refresh(campeonato)
+    
+    return {"message": "Campeonato finalizado correctamente"} 

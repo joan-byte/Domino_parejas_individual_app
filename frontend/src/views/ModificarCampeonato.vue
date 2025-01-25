@@ -74,7 +74,7 @@ const campeonato = ref({
 const cargarCampeonato = async () => {
   try {
     const id = route.params.id
-    const response = await axios.get(`http://localhost:8000/api/v1/campeonatos/${id}`)
+    const response = await axios.get(`http://localhost:8000/api/campeonatos/${id}`)
     campeonato.value = response.data
   } catch (error) {
     alert('Error al cargar el campeonato')
@@ -85,7 +85,7 @@ const cargarCampeonato = async () => {
 const guardarCambios = async () => {
   try {
     const id = route.params.id
-    await axios.put(`http://localhost:8000/api/v1/campeonatos/${id}`, campeonato.value)
+    await axios.put(`http://localhost:8000/api/campeonatos/${id}`, campeonato.value)
     alert('Campeonato modificado exitosamente')
     router.push('/')
   } catch (error) {

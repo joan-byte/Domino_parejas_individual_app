@@ -122,7 +122,7 @@ const iniciarPaginacionAutomatica = () => {
 
 const cargarParejas = async () => {
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    const response = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
     if (response.ok) {
       const data = await response.json()
       parejas.value = data

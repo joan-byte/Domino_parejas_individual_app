@@ -72,7 +72,7 @@ const campeonato = ref({
 
 const crearCampeonato = async () => {
   try {
-    await axios.post('http://localhost:8000/api/v1/campeonatos/', campeonato.value)
+    await axios.post('http://localhost:8000/api/campeonatos/', campeonato.value)
     router.push('/')
   } catch (error) {
     alert('Error al crear el campeonato')

@@ -203,7 +203,7 @@ const guardarResultados = async () => {
   }
 
   try {
-    const url = 'http://localhost:8000/api/v1/resultados/mesa/'
+    const url = 'http://localhost:8000/api/resultados/mesa/'
     const method = props.resultadoExistente ? 'PUT' : 'POST'
     
     const response = await fetch(url, {
@@ -233,7 +233,7 @@ const onResultadoGuardado = async () => {
     window.dispatchEvent(new Event('ranking-update'))
     
     // Cerrar el popup
-    emit('close')
+    emit('update:show', false)
   } catch (error) {
     console.error('Error al procesar el guardado:', error)
   }

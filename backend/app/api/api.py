@@ -7,7 +7,7 @@ api_router.include_router(campeonatos.router, prefix="/campeonatos", tags=["camp
 api_router.include_router(jugadores.router, prefix="/jugadores", tags=["jugadores"])
 
 router = APIRouter(
-    prefix="/api/v1",
+    prefix="/api",
     tags=["api"]
 )
 

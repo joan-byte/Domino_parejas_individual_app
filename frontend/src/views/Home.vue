@@ -13,8 +13,14 @@
           :class="{ 'selected': campeonatoSeleccionado?.id === campeonato.id }"
           @click="seleccionarCampeonato(campeonato)"
         >
-          <h3>{{ campeonato.nombre }}</h3>
-          <div class="campeonato-info">
+          <div class="card-header">
+            <h2>{{ campeonato.nombre }}</h2>
+            <div class="estado-campeonato">
+              <span v-if="campeonato.finalizado" class="estado finalizado">Finalizado</span>
+              <span v-else-if="campeonato.partida_actual !== 'No hay registros'" class="estado activo">En curso</span>
+            </div>
+          </div>
+          <div class="card-content">
             <p><strong>Fecha de inicio:</strong> {{ formatDate(campeonato.fecha_inicio) }}</p>
             <p><strong>Duración:</strong> {{ campeonato.dias_duracion }} días</p>
             <p><strong>Partidas:</strong> {{ campeonato.numero_partidas }}</p>
@@ -137,12 +143,12 @@ watch(() => route.path, async (newPath) => {
 
 const cargarCampeonatos = async () => {
   try {
-    const responseCampeonatos = await axios.get('http://localhost:8000/api/campeonatos/')
-    const campeonatosData = responseCampeonatos.data
+    const response = await axios.get('http://localhost:8000/api/campeonatos/')
+    const campeonatosData = response.data
 
     for (const campeonato of campeonatosData) {
       try {
-        const responsePartidas = await axios.get(`http://localhost:8000/api/v1/parejas-partida/ultima-partida/${campeonato.id}`)
+        const responsePartidas = await axios.get(`http://localhost:8000/api/parejas-partida/ultima-partida/${campeonato.id}`)
         if (responsePartidas.data.tiene_registros) {
           campeonato.partida_actual = responsePartidas.data.ultima_partida
         } else {
@@ -297,5 +303,35 @@ h2 {
 
 .btn-eliminar:hover {
   background-color: #c0392b;
+}
+
+.estado-campeonato {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+.estado {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+.estado.finalizado {
+  background-color: #dc3545;
+  color: white;
+}
+
+.estado.activo {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-seleccionar:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
 }
 </style> 

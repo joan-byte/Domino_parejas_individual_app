@@ -13,15 +13,30 @@ from app.schemas.pareja_partida import (
     AsignacionParejas,
     ParejaNueva
 )
+from app.models.jugador import Jugador
 
 router = APIRouter(
-    prefix="/api/v1",
     tags=["parejas-partida"]
 )
 
 @router.post("/parejas-partida/sorteo-inicial/", response_model=List[ParejaPartidaSchema])
 def crear_parejas_sorteo_inicial(datos: SorteoInicial, db: Session = Depends(get_db)):
     """Realiza el sorteo inicial para la primera partida"""
+    # Verificar que todos los jugadores estén activos
+    jugadores_activos = db.query(Jugador).filter(
+        Jugador.id.in_(datos.jugadores),
+        Jugador.activo == True
+    ).all()
+    
+    jugadores_activos_ids = [j.id for j in jugadores_activos]
+    jugadores_inactivos = set(datos.jugadores) - set(jugadores_activos_ids)
+    
+    if jugadores_inactivos:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Los siguientes jugadores no están activos: {list(jugadores_inactivos)}"
+        )
+    
     # Verificar número par de jugadores
     if len(datos.jugadores) % 4 != 0:
         raise HTTPException(status_code=400, detail="El número de jugadores debe ser múltiplo de 4")
@@ -137,9 +152,13 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
 @router.get("/parejas-partida/campeonato/{campeonato_id}/partida/{partida}", response_model=List[ParejaPartidaSchema])
 def get_parejas_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
     """Obtiene todas las parejas de una partida específica"""
-    parejas = db.query(ParejaPartida).filter(
+    parejas = db.query(ParejaPartida).join(
+        Jugador, 
+        (ParejaPartida.jugador1_id == Jugador.id) | (ParejaPartida.jugador2_id == Jugador.id)
+    ).filter(
         ParejaPartida.campeonato_id == campeonato_id,
-        ParejaPartida.partida == partida
+        ParejaPartida.partida == partida,
+        Jugador.activo == True
     ).order_by(ParejaPartida.mesa, ParejaPartida.numero_pareja).all()
     return parejas
 
