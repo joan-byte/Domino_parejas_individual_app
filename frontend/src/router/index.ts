@@ -40,12 +40,12 @@ const routes = [
     component: RegistroMesas
   },
   {
-    path: '/resultados/ranking',
+    path: '/resultados/ranking/:campeonatoId',
     name: 'ranking',
     component: Ranking
   },
   {
-    path: '/resultados/podium',
+    path: '/resultados/podium/:campeonatoId',
     name: 'podium',
     component: Podium
   }

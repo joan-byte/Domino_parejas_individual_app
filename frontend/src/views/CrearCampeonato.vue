@@ -72,10 +72,38 @@ const campeonato = ref({
 
 const crearCampeonato = async () => {
   try {
-    await axios.post('http://localhost:8000/api/campeonatos/', campeonato.value)
-    router.push('/')
+    // Validar campos requeridos
+    if (!campeonato.value.nombre || !campeonato.value.fecha_inicio || 
+        !campeonato.value.dias_duracion || !campeonato.value.numero_partidas) {
+      alert('Por favor, complete todos los campos')
+      return
+    }
+
+    const response = await axios.post('http://localhost:8000/api/campeonatos/', 
+      campeonato.value,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }
+    )
+
+    if (response.status === 201) {
+      alert('Campeonato creado exitosamente')
+      router.push('/')
+    }
   } catch (error) {
-    alert('Error al crear el campeonato')
+    console.error('Error al crear el campeonato:', error)
+    let mensajeError = 'Error al crear el campeonato'
+    if (error.response) {
+      // El servidor respondió con un código de error
+      mensajeError = error.response.data?.detail || mensajeError
+    } else if (error.request) {
+      // La petición fue hecha pero no se recibió respuesta
+      mensajeError = 'No se pudo conectar con el servidor'
+    }
+    alert(mensajeError)
   }
 }
 </script>

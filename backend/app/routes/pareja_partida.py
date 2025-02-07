@@ -16,73 +16,83 @@ from app.schemas.pareja_partida import (
 from app.models.jugador import Jugador
 
 router = APIRouter(
+    prefix="/parejas-partida",
     tags=["parejas-partida"]
 )
 
-@router.post("/parejas-partida/sorteo-inicial/", response_model=List[ParejaPartidaSchema])
-def crear_parejas_sorteo_inicial(datos: SorteoInicial, db: Session = Depends(get_db)):
-    """Realiza el sorteo inicial para la primera partida"""
-    # Verificar que todos los jugadores estén activos
-    jugadores_activos = db.query(Jugador).filter(
-        Jugador.id.in_(datos.jugadores),
-        Jugador.activo == True
-    ).all()
-    
-    jugadores_activos_ids = [j.id for j in jugadores_activos]
-    jugadores_inactivos = set(datos.jugadores) - set(jugadores_activos_ids)
-    
-    if jugadores_inactivos:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Los siguientes jugadores no están activos: {list(jugadores_inactivos)}"
-        )
-    
-    # Verificar número par de jugadores
-    if len(datos.jugadores) % 4 != 0:
-        raise HTTPException(status_code=400, detail="El número de jugadores debe ser múltiplo de 4")
-    
-    # Mezclar aleatoriamente los jugadores
-    jugadores = datos.jugadores.copy()
-    random.shuffle(jugadores)
-    
-    parejas = []
-    num_mesas = len(jugadores) // 4
-    
-    # Crear parejas y asignar a mesas
-    for mesa in range(1, num_mesas + 1):
-        # Obtener los 4 jugadores para esta mesa
-        idx_base = (mesa - 1) * 4
-        jugadores_mesa = jugadores[idx_base:idx_base + 4]
+@router.post("/sorteo-inicial/")
+async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(get_db)):
+    """Realiza el sorteo inicial de parejas y mesas para la primera partida"""
+    try:
+        # Verificar que todos los jugadores estén activos
+        jugadores_activos = db.query(Jugador).filter(
+            Jugador.id.in_(sorteo.jugadores),
+            Jugador.activo == True
+        ).all()
         
-        # Crear pareja 1 (jugadores 0 y 1)
-        pareja1 = ParejaPartida(
-            partida=1,  # Primera partida
-            mesa=mesa,
-            jugador1_id=jugadores_mesa[0],
-            jugador2_id=jugadores_mesa[1],
-            numero_pareja=1,
-            campeonato_id=datos.campeonato_id
-        )
+        jugadores_activos_ids = [j.id for j in jugadores_activos]
+        jugadores_inactivos = set(sorteo.jugadores) - set(jugadores_activos_ids)
         
-        # Crear pareja 2 (jugadores 2 y 3)
-        pareja2 = ParejaPartida(
-            partida=1,  # Primera partida
-            mesa=mesa,
-            jugador1_id=jugadores_mesa[2],
-            jugador2_id=jugadores_mesa[3],
-            numero_pareja=2,
-            campeonato_id=datos.campeonato_id
-        )
+        if jugadores_inactivos:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Los siguientes jugadores no están activos: {list(jugadores_inactivos)}"
+            )
         
-        db.add(pareja1)
-        db.add(pareja2)
-        parejas.extend([pareja1, pareja2])
-    
-    db.commit()
-    for pareja in parejas:
-        db.refresh(pareja)
-    
-    return parejas
+        # Verificar número par de jugadores
+        if len(sorteo.jugadores) % 4 != 0:
+            raise HTTPException(status_code=400, detail="El número de jugadores debe ser múltiplo de 4")
+        
+        # Mezclar aleatoriamente los jugadores
+        jugadores = sorteo.jugadores.copy()
+        random.shuffle(jugadores)
+        
+        # Crear las parejas y asignar mesas
+        mesa = 1
+        parejas = []
+        
+        # Procesar jugadores de 4 en 4 para formar las mesas
+        for i in range(0, len(jugadores), 4):
+            if i + 3 >= len(jugadores):
+                break
+            
+            # Mezclar los 4 jugadores de esta mesa para formar parejas aleatorias
+            mesa_jugadores = jugadores[i:i+4]
+            random.shuffle(mesa_jugadores)
+            
+            # Crear primera pareja
+            pareja1 = ParejaPartida(
+                partida=1,
+                mesa=mesa,
+                jugador1_id=mesa_jugadores[0],
+                jugador2_id=mesa_jugadores[1],
+                numero_pareja=1,
+                campeonato_id=sorteo.campeonato_id
+            )
+            
+            # Crear segunda pareja
+            pareja2 = ParejaPartida(
+                partida=1,
+                mesa=mesa,
+                jugador1_id=mesa_jugadores[2],
+                jugador2_id=mesa_jugadores[3],
+                numero_pareja=2,
+                campeonato_id=sorteo.campeonato_id
+            )
+            
+            parejas.extend([pareja1, pareja2])
+            mesa += 1
+        
+        # Guardar todas las parejas en la base de datos
+        for pareja in parejas:
+            db.add(pareja)
+        
+        db.commit()
+        return {"message": "Sorteo inicial realizado con éxito"}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/parejas-partida/siguiente-partida/{campeonato_id}/{partida_actual}", response_model=List[ParejaPartidaSchema])
 def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db: Session = Depends(get_db)):
@@ -149,18 +159,25 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
     
     return parejas
 
-@router.get("/parejas-partida/campeonato/{campeonato_id}/partida/{partida}", response_model=List[ParejaPartidaSchema])
+@router.get("/campeonato/{campeonato_id}/partida/{partida}", response_model=List[ParejaPartidaSchema])
 def get_parejas_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
     """Obtiene todas las parejas de una partida específica"""
-    parejas = db.query(ParejaPartida).join(
-        Jugador, 
-        (ParejaPartida.jugador1_id == Jugador.id) | (ParejaPartida.jugador2_id == Jugador.id)
-    ).filter(
-        ParejaPartida.campeonato_id == campeonato_id,
-        ParejaPartida.partida == partida,
-        Jugador.activo == True
-    ).order_by(ParejaPartida.mesa, ParejaPartida.numero_pareja).all()
-    return parejas
+    try:
+        parejas = db.query(ParejaPartida).filter(
+            ParejaPartida.campeonato_id == campeonato_id,
+            ParejaPartida.partida == partida
+        ).all()
+
+        # Cargar los datos de los jugadores para cada pareja
+        for pareja in parejas:
+            # Cargar jugador1
+            pareja.jugador1 = db.query(Jugador).filter(Jugador.id == pareja.jugador1_id).first()
+            # Cargar jugador2
+            pareja.jugador2 = db.query(Jugador).filter(Jugador.id == pareja.jugador2_id).first()
+
+        return parejas
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/parejas-partida/mesa/{campeonato_id}/{partida}/{mesa}", response_model=List[ParejaPartidaSchema])
 def get_parejas_mesa(campeonato_id: int, partida: int, mesa: int, db: Session = Depends(get_db)):

@@ -18,7 +18,7 @@
     </button>
 
     <div v-if="!inscripcionFinalizada">
-      <h2>Inscripción de Jugador</h2>
+      <h2>{{ jugadorSeleccionado ? 'Modificar Jugador' : 'Inscripción de Jugador' }}</h2>
       <form @submit.prevent="guardarJugador" class="inscripcion-form" autocomplete="off">
         <div class="form-group">
           <label for="nombre">Nombre:</label>
@@ -56,7 +56,27 @@
           >
         </div>
 
-        <button type="submit" class="btn-submit">Inscribir Jugador</button>
+        <div class="button-group">
+          <button 
+            v-if="jugadorSeleccionado" 
+            type="button" 
+            class="btn-cancel" 
+            @click="cancelarEdicion"
+          >
+            Cancelar
+          </button>
+          <button type="submit" class="btn-submit">
+            {{ jugadorSeleccionado ? 'Guardar Cambios' : 'Inscribir Jugador' }}
+          </button>
+          <button 
+            v-if="jugadorSeleccionado" 
+            type="button" 
+            class="btn-delete" 
+            @click="eliminarJugador"
+          >
+            Eliminar Jugador
+          </button>
+        </div>
       </form>
     </div>
 
@@ -75,24 +95,27 @@
             <th>Nombre</th>
             <th>Apellidos</th>
             <th>Club</th>
-            <th>Campeonato</th>
             <th>Estado</th>
             <th>Acción</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="j in jugadores" :key="j.id">
+          <tr 
+            v-for="j in jugadores" 
+            :key="j.id"
+            :class="{ 'selected': jugadorSeleccionado?.id === j.id }"
+            @click="seleccionarJugador(j)"
+          >
             <td>{{ j.id }}</td>
             <td>{{ j.nombre }}</td>
             <td>{{ j.apellidos }}</td>
             <td>{{ j.club }}</td>
-            <td>{{ j.campeonato_id }}</td>
             <td :class="['estado', j.activo ? 'estado-activo' : 'estado-inactivo']">
               {{ j.activo ? 'Activo' : 'Inactivo' }}
             </td>
             <td>
               <button 
-                @click="toggleActivo(j.id)" 
+                @click.stop="toggleActivo(j.id)" 
                 :class="['btn-toggle', j.activo ? 'activo' : 'inactivo']"
               >
                 {{ j.activo ? 'Desactivar' : 'Activar' }}
@@ -108,6 +131,7 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,12 +140,13 @@ const jugadores = ref([])
 const nombreInput = ref(null)
 const inscripcionFinalizada = ref(false)
 const hayResultados = ref(false)
+const jugadorSeleccionado = ref(null)
 
-const jugador = reactive({
+const jugador = ref({
   nombre: '',
   apellidos: '',
   club: '',
-  campeonatoId: campeonatoId
+  campeonato_id: campeonatoId
 })
 
 const focusNombreInput = () => {
@@ -132,7 +157,7 @@ const focusNombreInput = () => {
 
 const cargarJugadores = async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/jugadores/')
+    const response = await fetch(`http://localhost:8000/api/jugadores/campeonato/${campeonatoId}`)
     if (response.ok) {
       const nuevosJugadores = await response.json()
       // Ordenar jugadores por ID de forma descendente
@@ -184,50 +209,59 @@ const toggleActivo = async (jugadorId) => {
   }
 }
 
+const seleccionarJugador = (j) => {
+  jugadorSeleccionado.value = j
+  jugador.value = { ...j }
+}
+
+const cancelarEdicion = () => {
+  jugadorSeleccionado.value = null
+  jugador.value = {
+    nombre: '',
+    apellidos: '',
+    club: '',
+    campeonato_id: route.params.campeonatoId
+  }
+  focusNombreInput()
+}
+
+const eliminarJugador = async () => {
+  if (!jugadorSeleccionado.value) return
+  
+  if (confirm('¿Está seguro de que desea eliminar este jugador?')) {
+    try {
+      await axios.delete(`http://localhost:8000/api/jugadores/${jugadorSeleccionado.value.id}`)
+      await cargarJugadores()
+      cancelarEdicion()
+      alert('Jugador eliminado exitosamente')
+    } catch (error) {
+      console.error('Error al eliminar jugador:', error)
+      alert('Error al eliminar el jugador')
+    }
+  }
+}
+
 const guardarJugador = async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/jugadores/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nombre: jugador.nombre,
-        apellidos: jugador.apellidos,
-        club: jugador.club,
-        campeonato_id: parseInt(jugador.campeonatoId)
-      })
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      alert(errorData.detail)
-      // Refrescar la página si el error es de jugador duplicado
-      if (errorData.detail.includes('ya está inscrito en este campeonato')) {
-        window.location.reload()
-      }
-      return
+    if (jugadorSeleccionado.value) {
+      // Actualizar jugador existente
+      await axios.put(`http://localhost:8000/api/jugadores/${jugadorSeleccionado.value.id}`, jugador.value)
+      alert('Jugador actualizado exitosamente')
+    } else {
+      // Crear nuevo jugador
+      await axios.post('http://localhost:8000/api/jugadores/', jugador.value)
     }
-
-    const nuevoJugador = await response.json()
-    jugadores.value.unshift(nuevoJugador)
     
-    // Limpiar el formulario
-    Object.assign(jugador, {
-      nombre: '',
-      apellidos: '',
-      club: '',
-      campeonatoId: campeonatoId
-    })
-    
-    // Mostrar mensaje de éxito
-    alert('Jugador inscrito correctamente')
-    
-    // Poner el foco en el input de nombre
+    await cargarJugadores()
+    cancelarEdicion()
     focusNombreInput()
   } catch (error) {
-    console.error('Error:', error)
-    alert('Error al inscribir el jugador')
+    console.error('Error al guardar jugador:', error)
+    let mensajeError = 'Error al guardar el jugador'
+    if (error.response?.data?.detail) {
+      mensajeError = error.response.data.detail
+    }
+    alert(mensajeError)
   }
 }
 
@@ -257,8 +291,16 @@ const finalizarInscripcion = async () => {
       throw new Error(error.detail || 'Error al realizar el sorteo inicial')
     }
 
+    // Actualizar el estado del campeonato en localStorage
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    if (campeonatoGuardado) {
+      const campeonato = JSON.parse(campeonatoGuardado)
+      campeonato.partida_actual = 1
+      localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+      window.dispatchEvent(new Event('storage'))
+    }
+
     inscripcionFinalizada.value = true
-    alert('Sorteo inicial realizado con éxito')
   } catch (error) {
     console.error('Error:', error)
     alert(error.message || 'Error al realizar el sorteo inicial')
@@ -466,4 +508,41 @@ onMounted(async () => {
   color: #666;
   margin-bottom: 0.5rem;
 }
-</style> 
+
+.selected {
+  background-color: #e8f5e9;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.btn-cancel {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-delete {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background-color: #5a6268;
+}
+
+.btn-delete:hover {
+  background-color: #c82333;
+}
+</style>

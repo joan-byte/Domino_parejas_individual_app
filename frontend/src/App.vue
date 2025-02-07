@@ -38,8 +38,8 @@
             <span class="arrow">▼</span>
           </button>
           <div class="dropdown-content">
-            <router-link to="/resultados/ranking" class="dropdown-item">Ranking</router-link>
-            <router-link to="/resultados/podium" class="dropdown-item">Podium</router-link>
+            <router-link :to="`/resultados/ranking/${campeonatoSeleccionado.id}`" class="dropdown-item">Ranking</router-link>
+            <router-link :to="`/resultados/podium/${campeonatoSeleccionado.id}`" class="dropdown-item">Podium</router-link>
           </div>
         </div>
       </div>
@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 
 interface Campeonato {
   id: number
@@ -63,27 +63,40 @@ interface Campeonato {
 
 const campeonatoSeleccionado = ref<Campeonato | null>(null)
 
-const checkCampeonatoSeleccionado = (): void => {
+const checkCampeonatoSeleccionado = () => {
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
-  campeonatoSeleccionado.value = campeonatoGuardado ? JSON.parse(campeonatoGuardado) : null
+  if (campeonatoGuardado) {
+    try {
+      const campeonato = JSON.parse(campeonatoGuardado)
+      campeonatoSeleccionado.value = campeonato
+    } catch (error) {
+      console.error('Error al parsear el campeonato:', error)
+      localStorage.removeItem('campeonatoSeleccionado')
+      campeonatoSeleccionado.value = null
+    }
+  } else {
+    campeonatoSeleccionado.value = null
+  }
 }
 
-const limpiarCampeonato = (): void => {
+const limpiarCampeonato = () => {
   localStorage.removeItem('campeonatoSeleccionado')
   campeonatoSeleccionado.value = null
-  // Disparar el evento storage para que Home.vue se actualice
   window.dispatchEvent(new Event('storage'))
+}
+
+const handleStorageChange = () => {
+  checkCampeonatoSeleccionado()
 }
 
 onMounted(() => {
   checkCampeonatoSeleccionado()
-  window.addEventListener('storage', () => {
-    checkCampeonatoSeleccionado()
-  })
-})
-
-onUnmounted(() => {
-  window.removeEventListener('storage', checkCampeonatoSeleccionado)
+  window.addEventListener('storage', handleStorageChange)
+  
+  // Vue automáticamente ejecutará esta función cuando el componente se desmonte
+  return () => {
+    window.removeEventListener('storage', handleStorageChange)
+  }
 })
 </script>
 

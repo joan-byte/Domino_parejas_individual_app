@@ -29,14 +29,28 @@ async def create_jugador(jugador: JugadorCreate, db: Session = Depends(get_db)):
             detail=f"El jugador {jugador.nombre} {jugador.apellidos} ya está inscrito en este campeonato"
         )
     
+    # Obtener el último ID de jugador para este campeonato
+    ultimo_jugador = db.query(Jugador).filter(
+        Jugador.campeonato_id == jugador.campeonato_id
+    ).order_by(Jugador.id.desc()).first()
+    
+    # Si no hay jugadores, empezar desde 1, si no, incrementar el último ID
+    nuevo_id = 1 if not ultimo_jugador else ultimo_jugador.id + 1
+    
     # Crear el jugador con los campos del esquema y establecer activo=True
     jugador_data = jugador.dict()
     jugador_data['activo'] = True  # Forzar activo=True al crear
+    jugador_data['id'] = nuevo_id  # Asignar el nuevo ID
     db_jugador = Jugador(**jugador_data)
-    db.add(db_jugador)
-    db.commit()
-    db.refresh(db_jugador)
-    return db_jugador
+    
+    try:
+        db.add(db_jugador)
+        db.commit()
+        db.refresh(db_jugador)
+        return db_jugador
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_model=List[JugadorResponse])
 def read_jugadores(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):

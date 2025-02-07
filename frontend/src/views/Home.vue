@@ -92,16 +92,34 @@ const modificarCampeonato = (id) => {
 const eliminarCampeonato = async (id) => {
   if (confirm('¿Está seguro de que desea eliminar este campeonato?')) {
     try {
-      await axios.delete(`http://localhost:8000/api/campeonatos/${id}`)
-      if (campeonatoSeleccionado.value?.id === id) {
-        campeonatoSeleccionado.value = null
-        localStorage.removeItem('campeonatoSeleccionado')
+      const response = await axios.delete(`http://localhost:8000/api/campeonatos/${id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (response.status === 204) {
+        if (campeonatoSeleccionado.value?.id === id) {
+          campeonatoSeleccionado.value = null
+          localStorage.removeItem('campeonatoSeleccionado')
+          // Disparar evento storage para actualizar otros componentes
+          window.dispatchEvent(new Event('storage'))
+        }
+        alert('Campeonato eliminado exitosamente')
+        await cargarCampeonatos()
       }
-      alert('Campeonato eliminado exitosamente')
-      await cargarCampeonatos()
     } catch (error) {
       console.error('Error al eliminar el campeonato:', error)
-      alert('Error al eliminar el campeonato')
+      let mensajeError = 'Error al eliminar el campeonato'
+      if (error.response) {
+        // El servidor respondió con un código de error
+        mensajeError = error.response.data?.detail || mensajeError
+      } else if (error.request) {
+        // La petición fue hecha pero no se recibió respuesta
+        mensajeError = 'No se pudo conectar con el servidor'
+      }
+      alert(mensajeError)
     }
   }
 }
