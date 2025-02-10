@@ -110,6 +110,17 @@ onMounted(() => {
   padding-top: 80px; /* Espacio para la navbar fija */
 }
 
+/* Estilos para impresión */
+@media print {
+  #app {
+    padding-top: 0 !important;
+  }
+
+  .navbar {
+    display: none !important;
+  }
+}
+
 .navbar {
   background-color: #4CAF50;
   padding: 1rem 2rem;
