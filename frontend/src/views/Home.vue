@@ -170,7 +170,7 @@ const cargarCampeonatos = async () => {
         if (responsePartidas.data.tiene_registros) {
           campeonato.partida_actual = responsePartidas.data.ultima_partida
         } else {
-          campeonato.partida_actual = "No hay registros"
+          campeonato.partida_actual = 0
         }
       } catch (error) {
         console.error(`Error al obtener la última partida del campeonato ${campeonato.id}:`, error)

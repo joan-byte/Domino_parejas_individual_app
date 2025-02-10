@@ -1,6 +1,6 @@
 <template>
   <div class="asignacion-mesas">
-    <div class="header">
+    <div class="header no-print">
       <h2>Asignación de Mesas</h2>
       <div class="header-actions">
         <button class="btn-imprimir" @click="imprimirMesas">
@@ -44,44 +44,60 @@
       <div v-for="(mesasPar, index) in mesasParaImprimir" :key="index" class="print-page">
         <div v-for="mesa in mesasPar" :key="mesa.numero" class="print-mesa">
           <div class="mesa-header">
-            <h3>CAMPEONATO</h3>
-            <h4>{{ campeonatoSeleccionado?.nombre }}</h4>
+            <div class="titulo-campeonato">CAMPEONATO</div>
+            <div class="nombre-club">{{ campeonatoSeleccionado?.nombre }}</div>
             <div class="mesa-info">
               <span>Partida {{ partidaActual }}</span>
               <span>Mesa {{ mesa.numero }}</span>
             </div>
           </div>
+
           <div class="parejas-container">
-            <div class="pareja">
-              <div class="jugador">
-                <span>{{ mesa.pareja1?.jugador1?.nombre }} {{ mesa.pareja1?.jugador1?.apellidos }}</span>
-                <div class="puntos">
-                  <span>PG {{ mesa.pareja1?.jugador1?.PG || 0 }}</span>
-                  <span>PP {{ mesa.pareja1?.jugador1?.PP || 150 }}</span>
+            <!-- Jugadores -->
+            <div class="jugadores-grid">
+              <!-- Pareja 1 - Izquierda -->
+              <div class="jugador-columna izquierda">
+                <div class="jugador">
+                  <div class="nombre">{{ mesa.pareja1?.jugador1?.nombre }} {{ mesa.pareja1?.jugador1?.apellidos }}</div>
+                  <div class="puntos">PG {{ mesa.pareja1?.jugador1?.PP || 150 }}</div>
+                </div>
+                <div class="jugador">
+                  <div class="nombre">{{ mesa.pareja1?.jugador2?.nombre }} {{ mesa.pareja1?.jugador2?.apellidos }}</div>
+                  <div class="puntos">PG {{ mesa.pareja1?.jugador2?.PP || 150 }}</div>
                 </div>
               </div>
-              <div class="jugador">
-                <span>{{ mesa.pareja1?.jugador2?.nombre }} {{ mesa.pareja1?.jugador2?.apellidos }}</span>
-                <div class="puntos">
-                  <span>PG {{ mesa.pareja1?.jugador2?.PG || 0 }}</span>
-                  <span>PP {{ mesa.pareja1?.jugador2?.PP || 150 }}</span>
+
+              <!-- Pareja 2 - Derecha -->
+              <div class="jugador-columna derecha">
+                <div class="jugador">
+                  <div class="nombre">{{ mesa.pareja2?.jugador1?.nombre }} {{ mesa.pareja2?.jugador1?.apellidos }}</div>
+                  <div class="puntos">PG {{ mesa.pareja2?.jugador1?.PP || 150 }}</div>
+                </div>
+                <div class="jugador">
+                  <div class="nombre">{{ mesa.pareja2?.jugador2?.nombre }} {{ mesa.pareja2?.jugador2?.apellidos }}</div>
+                  <div class="puntos">PG {{ mesa.pareja2?.jugador2?.PP || 150 }}</div>
                 </div>
               </div>
             </div>
+
+            <!-- Líneas -->
             <div class="lineas">
               <div v-for="n in 15" :key="n" class="linea">
                 <span class="numero">{{ n }}</span>
-                <div class="linea-pareja1"></div>
-                <div class="linea-pareja2"></div>
+                <div class="linea-contenido"></div>
               </div>
             </div>
-            <div class="totales">
-              <div class="total">Total</div>
-              <div class="total">Total</div>
-            </div>
-            <div class="firmas">
-              <div class="firma">Firma</div>
-              <div class="firma">Firma</div>
+
+            <!-- Totales y Firmas -->
+            <div class="footer">
+              <div class="columna">
+                <div class="total">Total</div>
+                <div class="firma">Firma</div>
+              </div>
+              <div class="columna">
+                <div class="total">Total</div>
+                <div class="firma">Firma</div>
+              </div>
             </div>
           </div>
         </div>
@@ -392,77 +408,85 @@ const imprimirMesas = () => {
     margin: 0;
   }
 
-  /* Ocultar navbar y otros elementos */
-  nav, .navbar, .no-print {
-    display: none !important;
+  /* Ocultar todo excepto el contenido a imprimir */
+  body > * {
+    display: none;
   }
 
-  body {
+  .asignacion-mesas {
+    display: block !important;
     margin: 0;
     padding: 0;
   }
 
-  .print-only {
-    display: block;
-    width: 100%;
-    height: 100%;
+  .no-print {
+    display: none !important;
   }
 
-  .print-page {
+  .print-only {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 100%;
-    height: 100vh;
+    height: 100%;
+    background: white;
+  }
+
+  /* Página de impresión */
+  .print-page {
     display: flex;
     justify-content: space-between;
     padding: 20px;
     page-break-after: always;
-    box-sizing: border-box;
   }
 
+  /* Mesa individual */
   .print-mesa {
     width: 48%;
     border: 2px solid #000;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
+    padding: 15px;
+    background: white;
   }
 
+  /* Cabecera de la mesa */
   .mesa-header {
+    text-align: left;
     border-bottom: 2px solid #000;
     padding-bottom: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
   }
 
-  .mesa-header h3 {
-    margin: 0;
+  .titulo-campeonato {
     font-size: 24px;
     font-weight: bold;
-    text-align: left;
+    margin-bottom: 5px;
   }
 
-  .mesa-header h4 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: normal;
-    text-align: left;
+  .nombre-club {
+    font-size: 16px;
+    margin-bottom: 10px;
   }
 
   .mesa-info {
     display: flex;
     justify-content: space-between;
-    margin-top: 10px;
-    font-size: 16px;
+    font-size: 14px;
   }
 
-  .parejas-container {
-    flex-grow: 1;
+  /* Grid de jugadores */
+  .jugadores-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #000;
+  }
+
+  .jugador-columna {
     display: flex;
     flex-direction: column;
-  }
-
-  .pareja {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
+    gap: 10px;
   }
 
   .jugador {
@@ -470,66 +494,59 @@ const imprimirMesas = () => {
     flex-direction: column;
   }
 
-  .jugador span {
-    font-size: 16px;
-    margin-bottom: 5px;
-  }
-
-  .puntos {
-    display: flex;
-    gap: 20px;
-  }
-
-  .lineas {
-    margin-top: 20px;
-  }
-
-  .linea {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-  }
-
-  .numero {
-    width: 30px;
-    text-align: right;
-    margin-right: 10px;
+  .nombre {
     font-size: 14px;
   }
 
-  .linea-pareja1,
-  .linea-pareja2 {
-    flex: 1;
-    height: 1px;
+  .puntos {
+    font-size: 14px;
+  }
+
+  /* Líneas */
+  .lineas {
+    margin: 15px 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .linea {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .numero {
+    text-align: right;
+    padding-right: 10px;
+    font-size: 14px;
+  }
+
+  .linea-contenido {
     border-bottom: 1px solid #000;
-    margin: 0 10px;
+    height: 1px;
   }
 
-  .totales {
+  /* Footer */
+  .footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 15px;
+  }
+
+  .columna {
     display: flex;
-    justify-content: space-between;
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 2px solid #000;
+    flex-direction: column;
+    gap: 15px;
   }
 
-  .total {
-    font-size: 16px;
-    font-weight: bold;
-    width: 45%;
-  }
-
-  .firmas {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 20px;
-  }
-
-  .firma {
-    width: 45%;
+  .total, .firma {
     border-top: 2px solid #000;
     padding-top: 5px;
-    font-size: 16px;
+    font-size: 14px;
+    font-weight: bold;
   }
 }
 </style> 

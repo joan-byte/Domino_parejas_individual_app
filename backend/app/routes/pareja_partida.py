@@ -241,7 +241,7 @@ def asignar_parejas(datos: AsignacionParejas, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al asignar parejas: {str(e)}")
 
-@router.get("/parejas-partida/ultima-partida/{campeonato_id}")
+@router.get("/ultima-partida/{campeonato_id}")
 def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
     """Obtiene el número de la última partida registrada para un campeonato"""
     try:
@@ -251,17 +251,15 @@ def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
         ).first()
         
         if not existe_registro:
-            return {"ultima_partida": "No hay registros", "tiene_registros": False}
+            return {"ultima_partida": 0, "tiene_registros": False}
             
         ultima_partida = db.query(func.max(ParejaPartida.partida)).filter(
             ParejaPartida.campeonato_id == campeonato_id
         ).scalar()
         
-        print(f"Última partida para campeonato {campeonato_id}: {ultima_partida}")
         return {
-            "ultima_partida": ultima_partida if ultima_partida is not None else 1,
+            "ultima_partida": ultima_partida if ultima_partida is not None else 0,
             "tiene_registros": True
         }
     except Exception as e:
-        print(f"Error al obtener última partida: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 
