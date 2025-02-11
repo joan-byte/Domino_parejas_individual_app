@@ -454,8 +454,126 @@ const mesasPorPagina = computed(() => {
   return paginas
 })
 
-const imprimirMesas = () => {
-  window.print()
+const cargarMesas = async () => {
+  try {
+    console.log('Cargando mesas para partida:', partidaActual.value)
+    const response = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    if (response.ok) {
+      const parejas = await response.json()
+      console.log('Parejas recibidas:', parejas)
+      
+      // Obtener el ranking actualizado
+      const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId}`)
+      if (!rankingResponse.ok) {
+        throw new Error('Error al obtener el ranking')
+      }
+      const rankingData = await rankingResponse.json()
+      
+      // Crear un mapa para acceso rápido a los datos del ranking
+      const rankingMap = new Map(rankingData.map(r => [r.jugador_id, r]))
+      
+      // Agrupar parejas por mesa
+      const mesasTemp = []
+      const mesasProcesadas = new Set()
+      
+      parejas.forEach(pareja => {
+        if (!mesasProcesadas.has(pareja.mesa)) {
+          const pareja1 = parejas.find(p => p.mesa === pareja.mesa && p.numero_pareja === 1)
+          const pareja2 = parejas.find(p => p.mesa === pareja.mesa && p.numero_pareja === 2)
+          
+          if (pareja1 && pareja2) {
+            // Añadir datos del ranking a los jugadores
+            if (pareja1.jugador1) {
+              const rankingJugador1 = rankingMap.get(pareja1.jugador1_id)
+              pareja1.jugador1.PG = rankingJugador1?.PG || 0
+              pareja1.jugador1.PC = rankingJugador1?.PC || 0
+            }
+            if (pareja1.jugador2) {
+              const rankingJugador2 = rankingMap.get(pareja1.jugador2_id)
+              pareja1.jugador2.PG = rankingJugador2?.PG || 0
+              pareja1.jugador2.PC = rankingJugador2?.PC || 0
+            }
+            if (pareja2.jugador1) {
+              const rankingJugador3 = rankingMap.get(pareja2.jugador1_id)
+              pareja2.jugador1.PG = rankingJugador3?.PG || 0
+              pareja2.jugador1.PC = rankingJugador3?.PC || 0
+            }
+            if (pareja2.jugador2) {
+              const rankingJugador4 = rankingMap.get(pareja2.jugador2_id)
+              pareja2.jugador2.PG = rankingJugador4?.PG || 0
+              pareja2.jugador2.PC = rankingJugador4?.PC || 0
+            }
+            
+            mesasTemp.push({
+              numeroMesa: pareja.mesa,
+              pareja1,
+              pareja2
+            })
+            mesasProcesadas.add(pareja.mesa)
+          }
+        }
+      })
+      
+      console.log('Mesas procesadas:', mesasTemp)
+      parejas.value = mesasTemp
+      await verificarMesasRegistradas()
+    } else {
+      console.error('Error al cargar las mesas:', response.statusText)
+      parejas.value = []
+    }
+  } catch (error) {
+    console.error('Error al cargar las mesas:', error)
+    parejas.value = []
+  }
+}
+
+const imprimirMesas = async () => {
+  try {
+    // Obtener el ranking actualizado
+    const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId}`)
+    if (!rankingResponse.ok) {
+      throw new Error('Error al obtener el ranking')
+    }
+    const rankingData = await rankingResponse.json()
+    
+    // Actualizar los datos de PG y PC de cada jugador
+    const rankingMap = new Map(rankingData.map(r => [r.jugador_id, r]))
+    
+    // Actualizar los datos en las mesas
+    mesasAplanadas.value.forEach(mesa => {
+      if (mesa.pareja1?.jugador1) {
+        const ranking = rankingMap.get(mesa.pareja1.jugador1_id)
+        mesa.pareja1.jugador1.PG = ranking?.PG || 0
+        mesa.pareja1.jugador1.PC = ranking?.PC || 0
+      }
+      if (mesa.pareja1?.jugador2) {
+        const ranking = rankingMap.get(mesa.pareja1.jugador2_id)
+        mesa.pareja1.jugador2.PG = ranking?.PG || 0
+        mesa.pareja1.jugador2.PC = ranking?.PC || 0
+      }
+      if (mesa.pareja2?.jugador1) {
+        const ranking = rankingMap.get(mesa.pareja2.jugador1_id)
+        mesa.pareja2.jugador1.PG = ranking?.PG || 0
+        mesa.pareja2.jugador1.PC = ranking?.PC || 0
+      }
+      if (mesa.pareja2?.jugador2) {
+        const ranking = rankingMap.get(mesa.pareja2.jugador2_id)
+        mesa.pareja2.jugador2.PG = ranking?.PG || 0
+        mesa.pareja2.jugador2.PC = ranking?.PC || 0
+      }
+    })
+    
+    // Forzar una actualización de la vista
+    mesasAplanadas.value = [...mesasAplanadas.value]
+    
+    // Imprimir después de un pequeño delay para asegurar que los datos se han actualizado
+    setTimeout(() => {
+      window.print()
+    }, 100)
+  } catch (error) {
+    console.error('Error al obtener el ranking:', error)
+    alert('Error al obtener los datos del ranking')
+  }
 }
 </script>
 
@@ -706,27 +824,35 @@ const imprimirMesas = () => {
   }
 
   .jugador {
-    margin-bottom: 2px;
+    margin-bottom: 4px;
   }
 
   .jugador-info {
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 2px;
   }
 
   .nombre {
     font-weight: bold;
     font-size: 14px;
-    margin-bottom: 0;
+    margin-right: 10px;
   }
 
   .puntos-container {
     display: flex;
     gap: 15px;
-    margin-left: 15px;
+    margin-left: auto;
     font-size: 12px;
-    margin-top: 1px;
+    justify-content: flex-end;
+    width: 140px;
+  }
+
+  .puntos {
+    font-weight: bold;
+    color: #333;
+    min-width: 50px;
+    text-align: right;
   }
 
   .numero {
