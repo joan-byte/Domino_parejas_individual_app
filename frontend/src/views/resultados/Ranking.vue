@@ -15,6 +15,7 @@
           <th>PG</th>
           <th>PC</th>
           <th>PT</th>
+          <th>MG</th>
           <th>ID</th>
           <th>Nombre</th>
           <th>Apellidos</th>
@@ -30,6 +31,7 @@
           <td>{{ jugador.PG }}</td>
           <td>{{ jugador.PC }}</td>
           <td>{{ jugador.PT }}</td>
+          <td>{{ jugador.MG }}</td>
           <td>{{ jugador.jugador_id }}</td>
           <td>{{ jugador.nombre }}</td>
           <td>{{ jugador.apellidos }}</td>

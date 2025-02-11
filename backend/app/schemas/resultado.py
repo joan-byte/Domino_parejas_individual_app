@@ -11,6 +11,7 @@ class ResultadoBase(BaseModel):
     PV: int          # Puntos Válidos (≤300)
     PC: int          # Puntos Conseguidos (PV propio - PV contrario)
     PG: int          # Partida Ganada (1 si PC > 0, 0 si PC < 0)
+    MG: int          # Mesas Ganadas
     campeonato_id: int
 
 class ResultadoMesaInput(BaseModel):
@@ -23,6 +24,8 @@ class ResultadoMesaInput(BaseModel):
     jugador4_id: int
     puntos_pareja1: int
     puntos_pareja2: int
+    mesas_ganadas_pareja1: int
+    mesas_ganadas_pareja2: int
 
 class Resultado(ResultadoBase):
     id: int

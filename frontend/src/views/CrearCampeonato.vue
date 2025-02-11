@@ -72,40 +72,41 @@ const campeonato = ref({
 
 const crearCampeonato = async () => {
   try {
-    // Validar campos requeridos
-    if (!campeonato.value.nombre || !campeonato.value.fecha_inicio || 
-        !campeonato.value.dias_duracion || !campeonato.value.numero_partidas) {
-      alert('Por favor, complete todos los campos')
-      return
+    const response = await fetch('http://localhost:8000/api/campeonatos/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nombre: campeonato.value.nombre,
+        fecha_inicio: campeonato.value.fecha_inicio,
+        dias_duracion: parseInt(campeonato.value.dias_duracion),
+        numero_partidas: parseInt(campeonato.value.numero_partidas)
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Error al crear el campeonato');
     }
 
-    const response = await axios.post('http://localhost:8000/api/campeonatos/', 
-      campeonato.value,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      }
-    )
-
-    if (response.status === 201) {
-      alert('Campeonato creado exitosamente')
-      router.push('/')
-    }
+    const data = await response.json();
+    
+    // Guardar el campeonato seleccionado en localStorage
+    localStorage.setItem('campeonatoSeleccionado', JSON.stringify(data));
+    
+    // Mostrar mensaje de éxito
+    alert('Campeonato creado exitosamente');
+    
+    // Redirigir a inicio y recargar la página
+    router.push('/').then(() => {
+      window.location.reload();
+    });
   } catch (error) {
-    console.error('Error al crear el campeonato:', error)
-    let mensajeError = 'Error al crear el campeonato'
-    if (error.response) {
-      // El servidor respondió con un código de error
-      mensajeError = error.response.data?.detail || mensajeError
-    } else if (error.request) {
-      // La petición fue hecha pero no se recibió respuesta
-      mensajeError = 'No se pudo conectar con el servidor'
-    }
-    alert(mensajeError)
+    console.error('Error al crear el campeonato:', error);
+    alert(error.message || 'Error al crear el campeonato');
   }
-}
+};
 </script>
 
 <style scoped>

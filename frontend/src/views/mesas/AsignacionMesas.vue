@@ -247,14 +247,14 @@ const parejas = ref([])
 const paginaActual = ref(0)
 const jugadoresPorPagina = 15
 const campeonatoSeleccionado = ref(null)
-const partidaActual = ref(1)
+const partidaActual = ref(0)
 let intervaloAutomatico = null
 
 const checkCampeonatoSeleccionado = () => {
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
   if (campeonatoGuardado) {
     campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
-    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 1
+    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 0
   }
 }
 
@@ -338,13 +338,19 @@ const cargarParejas = async () => {
       return
     }
 
-    const partida = campeonatoSeleccionado.value.partida_actual || 1
+    const partida = campeonatoSeleccionado.value.partida_actual || 0
     if (typeof partida !== 'number') {
       console.error('La partida actual no es válida:', partida)
       return
     }
 
     partidaActual.value = partida
+
+    // Si no hay sorteo inicial (partida = 0), no intentamos cargar parejas
+    if (partida === 0) {
+      parejas.value = []
+      return
+    }
 
     // Obtener las parejas de la partida actual
     const parejasResponse = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partida}`)
@@ -390,7 +396,7 @@ watch(() => campeonatoSeleccionado.value?.partida_actual, (newPartida) => {
 onMounted(() => {
   checkCampeonatoSeleccionado()
   if (campeonatoSeleccionado.value) {
-    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 1
+    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 0
   }
   cargarParejas()
   

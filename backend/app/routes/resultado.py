@@ -44,6 +44,7 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
             PV=PV_pareja1,           # Puntos válidos de su pareja
             PC=PC_pareja1,           # Puntos conseguidos por su pareja
             PG=PG_pareja1,           # Si su pareja ganó
+            MG=datos.mesas_ganadas_pareja1,  # Mesas ganadas por su pareja
             campeonato_id=datos.campeonato_id
         )
         db.add(resultado)
@@ -60,6 +61,7 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
             PV=PV_pareja2,           # Puntos válidos de su pareja
             PC=PC_pareja2,           # Puntos conseguidos por su pareja
             PG=PG_pareja2,           # Si su pareja ganó
+            MG=datos.mesas_ganadas_pareja2,  # Mesas ganadas por su pareja
             campeonato_id=datos.campeonato_id
         )
         db.add(resultado)
@@ -187,6 +189,7 @@ async def get_ranking_campeonato(campeonato_id: int, db: Session = Depends(get_d
         func.sum(Resultado.PT).label('PT'),
         func.sum(Resultado.PG).label('PG'),
         func.sum(Resultado.PC).label('PC'),
+        func.sum(Resultado.MG).label('MG'),
         func.max(Resultado.partida).label('ultima_partida')
     ).filter(
         Resultado.campeonato_id == campeonato_id
@@ -209,11 +212,12 @@ async def get_ranking_campeonato(campeonato_id: int, db: Session = Depends(get_d
             "PT": int(resultados_jugador.PT) if resultados_jugador else 0,
             "PG": int(resultados_jugador.PG) if resultados_jugador else 0,
             "PC": int(resultados_jugador.PC) if resultados_jugador else 0,
+            "MG": int(resultados_jugador.MG) if resultados_jugador else 0,
             "ultima_partida": int(resultados_jugador.ultima_partida) if resultados_jugador else 0
         })
 
-    # Ordenamos el ranking por PG, PC y PT
-    ranking_list.sort(key=lambda x: (-x["PG"], -x["PC"], -x["PT"]))
+    # Ordenamos el ranking por PG, PC, PT y MG (ascendente)
+    ranking_list.sort(key=lambda x: (-x["PG"], -x["PC"], -x["PT"], x["MG"]))
     
     return ranking_list
 

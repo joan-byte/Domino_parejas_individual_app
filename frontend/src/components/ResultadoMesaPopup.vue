@@ -57,6 +57,17 @@
                 disabled
               >
             </div>
+            <div class="input-group">
+              <label for="mg-pareja1">MG:</label>
+              <input 
+                id="mg-pareja1"
+                name="mg-pareja1"
+                type="number" 
+                v-model="puntosPareja1.MG" 
+                min="0"
+                max="10"
+              >
+            </div>
           </div>
         </div>
 
@@ -115,6 +126,17 @@
                 disabled
               >
             </div>
+            <div class="input-group">
+              <label for="mg-pareja2">MG:</label>
+              <input 
+                id="mg-pareja2"
+                name="mg-pareja2"
+                type="number" 
+                v-model="puntosPareja2.MG" 
+                min="0"
+                max="10"
+              >
+            </div>
           </div>
         </div>
       </div>
@@ -150,8 +172,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:show', 'resultadoGuardado'])
 
-const puntosPareja1 = ref({ PT: 0, PV: 0, PC: 0, PG: 0 })
-const puntosPareja2 = ref({ PT: 0, PV: 0, PC: 0, PG: 0 })
+const puntosPareja1 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
+const puntosPareja2 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
 
 const pvIguales = computed(() => {
   return puntosPareja1.value.PV === puntosPareja2.value.PV && 
@@ -199,7 +221,9 @@ const guardarResultados = async () => {
     jugador3_id: props.mesa.pareja2.jugador1_id,
     jugador4_id: props.mesa.pareja2.jugador2_id,
     puntos_pareja1: puntosPareja1.value.PT,
-    puntos_pareja2: puntosPareja2.value.PT
+    puntos_pareja2: puntosPareja2.value.PT,
+    mesas_ganadas_pareja1: puntosPareja1.value.MG,
+    mesas_ganadas_pareja2: puntosPareja2.value.MG
   }
 
   try {
@@ -231,8 +255,8 @@ const guardarResultados = async () => {
 }
 
 const limpiarCampos = () => {
-  puntosPareja1.value = { PT: 0, PV: 0, PC: 0, PG: 0 }
-  puntosPareja2.value = { PT: 0, PV: 0, PC: 0, PG: 0 }
+  puntosPareja1.value = { PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 }
+  puntosPareja2.value = { PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 }
 }
 
 const cerrar = () => {
