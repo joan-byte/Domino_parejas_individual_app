@@ -248,11 +248,21 @@ const abrirModificacion = async (mesa) => {
   showPopup.value = true
 }
 
-const onResultadoGuardado = async () => {
+const onResultadoGuardado = async (resultado) => {
   try {
-    // Esperamos un momento para asegurar que los datos se han guardado en la BD
-    await new Promise(resolve => setTimeout(resolve, 200))
+    // Actualizar directamente el estado de la mesa registrada
+    mesasRegistradas.value = {
+      ...mesasRegistradas.value,
+      [resultado.mesa]: resultado.registrado
+    }
+    
+    // Recargar los datos completos
+    await cargarMesas()
     await verificarMesasRegistradas()
+    
+    // Disparar evento para actualizar el ranking
+    window.dispatchEvent(new Event('ranking-update'))
+    
     console.log('Estado actualizado después de guardar:', mesasRegistradas.value)
   } catch (error) {
     console.error('Error al actualizar estado después de guardar:', error)
@@ -294,62 +304,26 @@ const cerrarPartida = async () => {
     }
 
     // 2. Obtener el ranking actualizado
-    const responseRanking = await fetch(`http://localhost:8000/api/ranking/campeonato/${campeonatoId}`)
+    const responseRanking = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId}`)
     if (!responseRanking.ok) {
       throw new Error('Error al obtener el ranking')
     }
     const ranking = await responseRanking.json()
 
     // 3. Crear las nuevas parejas según el ranking
-    const nuevaPartida = partidaActual.value + 1
-    const parejasPorRanking = []
-    
-    // Ordenar jugadores por ranking (PT descendente)
-    const jugadoresOrdenados = ranking.sort((a, b) => b.PT - a.PT)
-    
-    // Crear parejas según el patrón: (1,3), (2,4), (5,7), (6,8), etc.
-    for (let i = 0; i < jugadoresOrdenados.length; i += 4) {
-      const mesa = Math.floor(i / 4) + 1
-      
-      // Pareja 1: jugador ranking 1 y 3 de cada grupo de 4
-      if (i + 2 < jugadoresOrdenados.length) {
-        parejasPorRanking.push({
-          mesa: mesa,
-          jugador1_id: jugadoresOrdenados[i].jugador_id,
-          jugador2_id: jugadoresOrdenados[i + 2].jugador_id,
-          partida: nuevaPartida
-        })
-      }
-      
-      // Pareja 2: jugador ranking 2 y 4 de cada grupo de 4
-      if (i + 3 < jugadoresOrdenados.length) {
-        parejasPorRanking.push({
-          mesa: mesa,
-          jugador1_id: jugadoresOrdenados[i + 1].jugador_id,
-          jugador2_id: jugadoresOrdenados[i + 3].jugador_id,
-          partida: nuevaPartida
-        })
-      }
-    }
-
-    // 4. Guardar las nuevas parejas
-    const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/asignar`, {
+    const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/parejas-partida/siguiente-partida/${campeonatoId}/${partidaActual.value}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        campeonato_id: campeonatoId,
-        partida: nuevaPartida,
-        parejas: parejasPorRanking
-      })
+      }
     })
 
     if (!responseNuevasParejas.ok) {
       throw new Error('Error al asignar nuevas parejas')
     }
 
-    // 5. Actualizar el localStorage con la nueva partida
+    // 4. Actualizar el localStorage con la nueva partida
+    const nuevaPartida = partidaActual.value + 1
     const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
     if (campeonatoGuardado) {
       const campeonato = JSON.parse(campeonatoGuardado)
@@ -358,7 +332,7 @@ const cerrarPartida = async () => {
     }
 
     alert('Partida cerrada y nuevas parejas asignadas correctamente')
-    // 6. Redirigir a la página de asignación de mesas para la siguiente partida
+    // 5. Redirigir a la página de asignación de mesas para la siguiente partida
     router.push(`/mesas/asignacion/${campeonatoId}`)
   } catch (error) {
     console.error('Error:', error)

@@ -4,6 +4,7 @@ from typing import List
 from app.db.base import get_db
 from app.models.resultado import Resultado
 from app.models.jugador import Jugador
+from app.models.pareja_partida import ParejaPartida
 from app.schemas.resultado import ResultadoMesaInput, Resultado as ResultadoSchema
 from sqlalchemy.sql import func
 
@@ -148,52 +149,71 @@ def update_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
     
     return resultados
 
-@router.get("/ranking/campeonato/{campeonato_id}")
+@router.get("/resultados/ranking/campeonato/{campeonato_id}")
 async def get_ranking_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
     """Obtiene el ranking de jugadores de un campeonato"""
     
-    # Obtener todos los resultados del campeonato solo para jugadores activos
-    ranking = db.query(
-        Resultado.jugador_id,
+    # Primero obtenemos todos los jugadores del sorteo inicial
+    jugadores_sorteo = db.query(
+        ParejaPartida.jugador1_id.label('jugador_id'),
         Jugador.nombre,
         Jugador.apellidos,
-        Jugador.club,
+        Jugador.club
+    ).join(
+        Jugador, ParejaPartida.jugador1_id == Jugador.id
+    ).filter(
+        ParejaPartida.campeonato_id == campeonato_id,
+        ParejaPartida.partida == 1
+    ).union(
+        db.query(
+            ParejaPartida.jugador2_id.label('jugador_id'),
+            Jugador.nombre,
+            Jugador.apellidos,
+            Jugador.club
+        ).join(
+            Jugador, ParejaPartida.jugador2_id == Jugador.id
+        ).filter(
+            ParejaPartida.campeonato_id == campeonato_id,
+            ParejaPartida.partida == 1
+        )
+    ).order_by('jugador_id').all()
+
+    if not jugadores_sorteo:
+        raise HTTPException(status_code=404, detail="No se encontraron jugadores para este campeonato")
+
+    # Luego obtenemos los resultados acumulados de todos los jugadores
+    resultados = db.query(
+        Resultado.jugador_id,
         func.sum(Resultado.PT).label('PT'),
         func.sum(Resultado.PG).label('PG'),
         func.sum(Resultado.PC).label('PC'),
         func.max(Resultado.partida).label('ultima_partida')
-    ).join(
-        Jugador, Resultado.jugador_id == Jugador.id
     ).filter(
-        Resultado.campeonato_id == campeonato_id,
-        Jugador.activo == True  # Filtrar solo jugadores activos
+        Resultado.campeonato_id == campeonato_id
     ).group_by(
-        Resultado.jugador_id,
-        Jugador.nombre,
-        Jugador.apellidos,
-        Jugador.club
-    ).order_by(
-        func.sum(Resultado.PG).desc(),
-        func.sum(Resultado.PC).desc(),
-        func.sum(Resultado.PT).desc()
+        Resultado.jugador_id
     ).all()
-    
-    if not ranking:
-        raise HTTPException(status_code=404, detail="No se encontraron resultados para este campeonato")
-    
-    # Convertir los resultados a un formato más amigable
+
+    # Creamos un diccionario con los resultados para acceso rápido
+    resultados_dict = {r.jugador_id: r for r in resultados}
+
+    # Combinamos la información
     ranking_list = []
-    for r in ranking:
+    for jugador in jugadores_sorteo:
+        resultados_jugador = resultados_dict.get(jugador.jugador_id)
         ranking_list.append({
-            "jugador_id": r.jugador_id,
-            "nombre": r.nombre,
-            "apellidos": r.apellidos,
-            "club": r.club,
-            "PT": int(r.PT),
-            "PG": int(r.PG),
-            "PC": int(r.PC),
-            "ultima_partida": int(r.ultima_partida)
+            "jugador_id": jugador.jugador_id,
+            "nombre": jugador.nombre,
+            "apellidos": jugador.apellidos,
+            "club": jugador.club,
+            "PT": int(resultados_jugador.PT) if resultados_jugador else 0,
+            "PG": int(resultados_jugador.PG) if resultados_jugador else 0,
+            "PC": int(resultados_jugador.PC) if resultados_jugador else 0,
+            "ultima_partida": int(resultados_jugador.ultima_partida) if resultados_jugador else 0
         })
+
+    # Ordenamos el ranking por PG, PC y PT
+    ranking_list.sort(key=lambda x: (-x["PG"], -x["PC"], -x["PT"]))
     
     return ranking_list
 

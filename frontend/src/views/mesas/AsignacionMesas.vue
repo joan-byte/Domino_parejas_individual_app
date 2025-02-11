@@ -42,187 +42,185 @@
 
     <div class="print-only">
       <div class="print-container">
-        <template v-for="(mesa, index) in mesasAplanadas" :key="mesa.numero">
-          <div v-if="index % 2 === 0" class="print-page">
-            <!-- Primera mesa de la página -->
-            <div class="print-mesa">
-              <div class="mesa-header">
-                <div class="header-top">
-                  <div class="header-left">
-                    <h1>CAMPEONATO</h1>
-                    <h2>Social Club Esportiu Garraf</h2>
-                  </div>
-                  <div class="header-right">
-                    <div class="mesa-info">
-                      <span>Partida {{ partidaActual }}</span>
-                      <span>Mesa {{ mesa.numero }}</span>
-                    </div>
+        <template v-for="(pagina, index) in mesasPorPagina" :key="index" class="print-page">
+          <!-- Primera mesa de la página -->
+          <div class="print-mesa">
+            <div class="mesa-header">
+              <div class="header-top">
+                <div class="header-left">
+                  <h1>CAMPEONATO</h1>
+                  <h2>Social Club Esportiu Garraf</h2>
+                </div>
+                <div class="header-right">
+                  <div class="mesa-info">
+                    <span>Partida {{ partidaActual }}</span>
+                    <span>Mesa {{ pagina.mesa1.numero }}</span>
                   </div>
                 </div>
               </div>
-              <div class="parejas-container">
-                <div class="jugadores-grid">
-                  <div class="pareja-container">
-                    <div class="jugador">
-                      <div class="jugador-info">
-                        <span class="nombre">{{ mesa.pareja1?.jugador1?.nombre }} {{ mesa.pareja1?.jugador1?.apellidos }}</span>
-                        <div class="puntos-container">
-                          <span class="puntos">PG {{ mesa.pareja1?.jugador1?.PP || 150 }}</span>
-                          <span class="puntos">PC {{ mesa.pareja1?.jugador1?.PC || 0 }}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="jugador">
-                      <div class="jugador-info">
-                        <span class="nombre">{{ mesa.pareja1?.jugador2?.nombre }} {{ mesa.pareja1?.jugador2?.apellidos }}</span>
-                        <div class="puntos-container">
-                          <span class="puntos">PG {{ mesa.pareja1?.jugador2?.PP || 150 }}</span>
-                          <span class="puntos">PC {{ mesa.pareja1?.jugador2?.PC || 0 }}</span>
-                        </div>
+            </div>
+            <div class="parejas-container">
+              <div class="jugadores-grid">
+                <div class="pareja-container">
+                  <div class="jugador">
+                    <div class="jugador-info">
+                      <span class="nombre">{{ pagina.mesa1.pareja1?.jugador1?.nombre }} {{ pagina.mesa1.pareja1?.jugador1?.apellidos }}</span>
+                      <div class="puntos-container">
+                        <span class="puntos">PG {{ pagina.mesa1.pareja1?.jugador1?.PG || 0 }}</span>
+                        <span class="puntos">PC {{ pagina.mesa1.pareja1?.jugador1?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
-                  <div class="pareja-container">
-                    <div class="jugador">
-                      <div class="jugador-info">
-                        <span class="nombre">{{ mesa.pareja2?.jugador1?.nombre }} {{ mesa.pareja2?.jugador1?.apellidos }}</span>
-                        <div class="puntos-container">
-                          <span class="puntos">PG {{ mesa.pareja2?.jugador1?.PP || 150 }}</span>
-                          <span class="puntos">PC {{ mesa.pareja2?.jugador1?.PC || 0 }}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="jugador">
-                      <div class="jugador-info">
-                        <span class="nombre">{{ mesa.pareja2?.jugador2?.nombre }} {{ mesa.pareja2?.jugador2?.apellidos }}</span>
-                        <div class="puntos-container">
-                          <span class="puntos">PG {{ mesa.pareja2?.jugador2?.PP || 150 }}</span>
-                          <span class="puntos">PC {{ mesa.pareja2?.jugador2?.PC || 0 }}</span>
-                        </div>
+                  <div class="jugador">
+                    <div class="jugador-info">
+                      <span class="nombre">{{ pagina.mesa1.pareja1?.jugador2?.nombre }} {{ pagina.mesa1.pareja1?.jugador2?.apellidos }}</span>
+                      <div class="puntos-container">
+                        <span class="puntos">PG {{ pagina.mesa1.pareja1?.jugador2?.PG || 0 }}</span>
+                        <span class="puntos">PC {{ pagina.mesa1.pareja1?.jugador2?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div class="lineas-container">
-                <div class="lineas-columna">
-                  <div class="lineas-wrapper">
-                    <div class="lineas">
-                      <div v-for="n in 15" :key="n" class="linea">
-                        <span class="numero">{{ n }}</span>
-                        <div class="linea-contenido"></div>
+                <div class="pareja-container">
+                  <div class="jugador">
+                    <div class="jugador-info">
+                      <span class="nombre">{{ pagina.mesa1.pareja2?.jugador1?.nombre }} {{ pagina.mesa1.pareja2?.jugador1?.apellidos }}</span>
+                      <div class="puntos-container">
+                        <span class="puntos">PG {{ pagina.mesa1.pareja2?.jugador1?.PG || 0 }}</span>
+                        <span class="puntos">PC {{ pagina.mesa1.pareja2?.jugador1?.PC || 0 }}</span>
                       </div>
-                    </div>
-                    <div class="columna">
-                      <div class="total">Total</div>
-                      <div class="firma">Firma</div>
                     </div>
                   </div>
-                </div>
-                <div class="lineas-columna">
-                  <div class="lineas-wrapper">
-                    <div class="lineas">
-                      <div v-for="n in 15" :key="n" class="linea">
-                        <span class="numero">{{ n }}</span>
-                        <div class="linea-contenido"></div>
+                  <div class="jugador">
+                    <div class="jugador-info">
+                      <span class="nombre">{{ pagina.mesa1.pareja2?.jugador2?.nombre }} {{ pagina.mesa1.pareja2?.jugador2?.apellidos }}</span>
+                      <div class="puntos-container">
+                        <span class="puntos">PG {{ pagina.mesa1.pareja2?.jugador2?.PG || 0 }}</span>
+                        <span class="puntos">PC {{ pagina.mesa1.pareja2?.jugador2?.PC || 0 }}</span>
                       </div>
-                    </div>
-                    <div class="columna">
-                      <div class="total">Total</div>
-                      <div class="firma">Firma</div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            
-            <!-- Segunda mesa de la página (si existe) -->
-            <div v-if="index + 1 < mesasAplanadas.length" class="print-mesa">
-              <div class="mesa-header">
-                <div class="header-top">
-                  <div class="header-left">
-                    <h1>CAMPEONATO</h1>
-                    <h2>Social Club Esportiu Garraf</h2>
+            <div class="lineas-container">
+              <div class="lineas-columna">
+                <div class="lineas-wrapper">
+                  <div class="lineas">
+                    <div v-for="n in 15" :key="n" class="linea">
+                      <span class="numero">{{ n }}</span>
+                      <div class="linea-contenido"></div>
+                    </div>
                   </div>
-                  <div class="header-right">
-                    <div class="mesa-info">
-                      <span>Partida {{ partidaActual }}</span>
-                      <span>Mesa {{ mesasAplanadas[index + 1].numero }}</span>
+                  <div class="columna">
+                    <div class="total">Total</div>
+                    <div class="firma">Firma</div>
+                  </div>
+                </div>
+              </div>
+              <div class="lineas-columna">
+                <div class="lineas-wrapper">
+                  <div class="lineas">
+                    <div v-for="n in 15" :key="n" class="linea">
+                      <span class="numero">{{ n }}</span>
+                      <div class="linea-contenido"></div>
+                    </div>
+                  </div>
+                  <div class="columna">
+                    <div class="total">Total</div>
+                    <div class="firma">Firma</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Segunda mesa de la página (si existe) -->
+          <div v-if="pagina.mesa2" class="print-mesa">
+            <div class="mesa-header">
+              <div class="header-top">
+                <div class="header-left">
+                  <h1>CAMPEONATO</h1>
+                  <h2>Social Club Esportiu Garraf</h2>
+                </div>
+                <div class="header-right">
+                  <div class="mesa-info">
+                    <span>Partida {{ partidaActual }}</span>
+                    <span>Mesa {{ pagina.mesa2.numero }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="parejas-container">
+              <div class="jugadores-grid">
+                <div class="pareja-container">
+                  <div class="jugador">
+                    <div class="jugador-info">
+                      <span class="nombre">{{ pagina.mesa2.pareja1?.jugador1?.nombre }} {{ pagina.mesa2.pareja1?.jugador1?.apellidos }}</span>
+                      <div class="puntos-container">
+                        <span class="puntos">PG {{ pagina.mesa2.pareja1?.jugador1?.PG || 0 }}</span>
+                        <span class="puntos">PC {{ pagina.mesa2.pareja1?.jugador1?.PC || 0 }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="jugador">
+                    <div class="jugador-info">
+                      <span class="nombre">{{ pagina.mesa2.pareja1?.jugador2?.nombre }} {{ pagina.mesa2.pareja1?.jugador2?.apellidos }}</span>
+                      <div class="puntos-container">
+                        <span class="puntos">PG {{ pagina.mesa2.pareja1?.jugador2?.PG || 0 }}</span>
+                        <span class="puntos">PC {{ pagina.mesa2.pareja1?.jugador2?.PC || 0 }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="pareja-container">
+                  <div class="jugador">
+                    <div class="jugador-info">
+                      <span class="nombre">{{ pagina.mesa2.pareja2?.jugador1?.nombre }} {{ pagina.mesa2.pareja2?.jugador1?.apellidos }}</span>
+                      <div class="puntos-container">
+                        <span class="puntos">PG {{ pagina.mesa2.pareja2?.jugador1?.PG || 0 }}</span>
+                        <span class="puntos">PC {{ pagina.mesa2.pareja2?.jugador1?.PC || 0 }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="jugador">
+                    <div class="jugador-info">
+                      <span class="nombre">{{ pagina.mesa2.pareja2?.jugador2?.nombre }} {{ pagina.mesa2.pareja2?.jugador2?.apellidos }}</span>
+                      <div class="puntos-container">
+                        <span class="puntos">PG {{ pagina.mesa2.pareja2?.jugador2?.PG || 0 }}</span>
+                        <span class="puntos">PC {{ pagina.mesa2.pareja2?.jugador2?.PC || 0 }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="parejas-container">
-                <div class="jugadores-grid">
-                  <div class="pareja-container">
-                    <div class="jugador">
-                      <div class="jugador-info">
-                        <span class="nombre">{{ mesasAplanadas[index + 1].pareja1?.jugador1?.nombre }} {{ mesasAplanadas[index + 1].pareja1?.jugador1?.apellidos }}</span>
-                        <div class="puntos-container">
-                          <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja1?.jugador1?.PP || 150 }}</span>
-                          <span class="puntos">PC {{ mesasAplanadas[index + 1].pareja1?.jugador1?.PC || 0 }}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="jugador">
-                      <div class="jugador-info">
-                        <span class="nombre">{{ mesasAplanadas[index + 1].pareja1?.jugador2?.nombre }} {{ mesasAplanadas[index + 1].pareja1?.jugador2?.apellidos }}</span>
-                        <div class="puntos-container">
-                          <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja1?.jugador2?.PP || 150 }}</span>
-                          <span class="puntos">PC {{ mesasAplanadas[index + 1].pareja1?.jugador2?.PC || 0 }}</span>
-                        </div>
-                      </div>
+            </div>
+            <div class="lineas-container">
+              <div class="lineas-columna">
+                <div class="lineas-wrapper">
+                  <div class="lineas">
+                    <div v-for="n in 15" :key="n" class="linea">
+                      <span class="numero">{{ n }}</span>
+                      <div class="linea-contenido"></div>
                     </div>
                   </div>
-                  <div class="pareja-container">
-                    <div class="jugador">
-                      <div class="jugador-info">
-                        <span class="nombre">{{ mesasAplanadas[index + 1].pareja2?.jugador1?.nombre }} {{ mesasAplanadas[index + 1].pareja2?.jugador1?.apellidos }}</span>
-                        <div class="puntos-container">
-                          <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja2?.jugador1?.PP || 150 }}</span>
-                          <span class="puntos">PC {{ mesasAplanadas[index + 1].pareja2?.jugador1?.PC || 0 }}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="jugador">
-                      <div class="jugador-info">
-                        <span class="nombre">{{ mesasAplanadas[index + 1].pareja2?.jugador2?.nombre }} {{ mesasAplanadas[index + 1].pareja2?.jugador2?.apellidos }}</span>
-                        <div class="puntos-container">
-                          <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja2?.jugador2?.PP || 150 }}</span>
-                          <span class="puntos">PC {{ mesasAplanadas[index + 1].pareja2?.jugador2?.PC || 0 }}</span>
-                        </div>
-                      </div>
-                    </div>
+                  <div class="columna">
+                    <div class="total">Total</div>
+                    <div class="firma">Firma</div>
                   </div>
                 </div>
               </div>
-              <div class="lineas-container">
-                <div class="lineas-columna">
-                  <div class="lineas-wrapper">
-                    <div class="lineas">
-                      <div v-for="n in 15" :key="n" class="linea">
-                        <span class="numero">{{ n }}</span>
-                        <div class="linea-contenido"></div>
-                      </div>
-                    </div>
-                    <div class="columna">
-                      <div class="total">Total</div>
-                      <div class="firma">Firma</div>
+              <div class="lineas-columna">
+                <div class="lineas-wrapper">
+                  <div class="lineas">
+                    <div v-for="n in 15" :key="n" class="linea">
+                      <span class="numero">{{ n }}</span>
+                      <div class="linea-contenido"></div>
                     </div>
                   </div>
-                </div>
-                <div class="lineas-columna">
-                  <div class="lineas-wrapper">
-                    <div class="lineas">
-                      <div v-for="n in 15" :key="n" class="linea">
-                        <span class="numero">{{ n }}</span>
-                        <div class="linea-contenido"></div>
-                      </div>
-                    </div>
-                    <div class="columna">
-                      <div class="total">Total</div>
-                      <div class="firma">Firma</div>
-                    </div>
+                  <div class="columna">
+                    <div class="total">Total</div>
+                    <div class="firma">Firma</div>
                   </div>
                 </div>
               </div>
@@ -334,14 +332,12 @@ const iniciarPaginacionAutomatica = () => {
 
 const cargarParejas = async () => {
   try {
-    // Asegurarse de que tenemos el campeonato y la partida actual
     checkCampeonatoSeleccionado()
     if (!campeonatoSeleccionado.value) {
       console.error('No hay campeonato seleccionado')
       return
     }
 
-    // Asegurarse de que la partida actual es un número
     const partida = campeonatoSeleccionado.value.partida_actual || 1
     if (typeof partida !== 'number') {
       console.error('La partida actual no es válida:', partida)
@@ -350,21 +346,35 @@ const cargarParejas = async () => {
 
     partidaActual.value = partida
 
-    const response = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partida}`)
-    if (response.ok) {
-      const data = await response.json()
-      parejas.value = data
-      
-      // Iniciar paginación automática después de cargar los datos
-      if (jugadoresOrdenados.value.length > jugadoresPorPagina) {
-        iniciarPaginacionAutomatica()
-      }
-    } else {
-      console.error('Error al cargar las parejas:', response.statusText)
+    // Obtener las parejas de la partida actual
+    const parejasResponse = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partida}`)
+    if (!parejasResponse.ok) {
+      console.error('Error al cargar las parejas:', parejasResponse.statusText)
       parejas.value = []
+      return
+    }
+    const parejasData = await parejasResponse.json()
+
+    // Asignar los puntos iniciales a cada jugador
+    parejas.value = parejasData.map(pareja => ({
+      ...pareja,
+      jugador1: {
+        ...pareja.jugador1,
+        PG: pareja.jugador1?.PP || 150,
+        PC: pareja.jugador1?.PC || 0
+      },
+      jugador2: {
+        ...pareja.jugador2,
+        PG: pareja.jugador2?.PP || 150,
+        PC: pareja.jugador2?.PC || 0
+      }
+    }))
+
+    if (jugadoresOrdenados.value.length > jugadoresPorPagina) {
+      iniciarPaginacionAutomatica()
     }
   } catch (error) {
-    console.error('Error al cargar las parejas:', error)
+    console.error('Error al cargar los datos:', error)
     parejas.value = []
   }
 }
@@ -409,7 +419,7 @@ const mesasAplanadas = computed(() => {
   parejas.value.forEach(pareja => {
     if (!mesasMap.has(pareja.mesa)) {
       mesasMap.set(pareja.mesa, {
-        numero: pareja.mesa,
+        numero: parseInt(pareja.mesa),
         pareja1: null,
         pareja2: null
       })
@@ -428,25 +438,20 @@ const mesasAplanadas = computed(() => {
     .filter(mesa => mesa.pareja1 && mesa.pareja2)
 
   // Ordenar las mesas por número
-  const mesasOrdenadas = mesasCompletas.sort((a, b) => {
-    return parseInt(a.numero) - parseInt(b.numero)
-  })
+  return mesasCompletas.sort((a, b) => parseInt(a.numero) - parseInt(b.numero))
+})
 
-  // Agrupar las mesas en pares secuenciales
-  const mesasAgrupadas = []
-  for (let i = 0; i < mesasOrdenadas.length; i++) {
-    mesasAgrupadas.push(mesasOrdenadas[i])
-  }
-
-  // Asegurarnos de que las mesas estén en orden correcto
-  return mesasAgrupadas.sort((a, b) => {
-    const numA = parseInt(a.numero)
-    const numB = parseInt(b.numero)
-    if (Math.floor((numA - 1) / 2) === Math.floor((numB - 1) / 2)) {
-      return numA - numB
+// Computed para tener las mesas organizadas por páginas
+const mesasPorPagina = computed(() => {
+  const paginas = []
+  for (let i = 0; i < mesasAplanadas.value.length; i += 2) {
+    const pagina = {
+      mesa1: mesasAplanadas.value[i],
+      mesa2: i + 1 < mesasAplanadas.value.length ? mesasAplanadas.value[i + 1] : null
     }
-    return Math.floor((numA - 1) / 2) - Math.floor((numB - 1) / 2)
-  })
+    paginas.push(pagina)
+  }
+  return paginas
 })
 
 const imprimirMesas = () => {

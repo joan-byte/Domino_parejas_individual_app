@@ -107,7 +107,7 @@ const checkCampeonatoSeleccionado = () => {
 
 const cargarDatos = async () => {
   try {
-    const response = await fetch(`http://localhost:8000/api/ranking/campeonato/${campeonatoSeleccionado.value.id}`)
+    const response = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoSeleccionado.value.id}`)
     if (response.ok) {
       const data = await response.json()
       rankingData.value = data
