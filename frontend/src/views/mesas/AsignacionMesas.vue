@@ -44,7 +44,7 @@
       <div class="print-container">
         <template v-for="(mesa, index) in mesasAplanadas" :key="mesa.numero">
           <div v-if="index % 2 === 0" class="print-page">
-            <!-- Primera mesa -->
+            <!-- Primera mesa de la página -->
             <div class="print-mesa">
               <div class="mesa-header">
                 <div class="header-top">
@@ -64,51 +64,79 @@
                 <div class="jugadores-grid">
                   <div class="pareja-container">
                     <div class="jugador">
-                      <span class="nombre">{{ mesa.pareja1?.jugador1?.nombre }} {{ mesa.pareja1?.jugador1?.apellidos }}</span>
-                      <span class="puntos">PG {{ mesa.pareja1?.jugador1?.PP || 150 }}</span>
+                      <div class="jugador-info">
+                        <span class="nombre">{{ mesa.pareja1?.jugador1?.nombre }} {{ mesa.pareja1?.jugador1?.apellidos }}</span>
+                        <div class="puntos-container">
+                          <span class="puntos">PG {{ mesa.pareja1?.jugador1?.PP || 150 }}</span>
+                          <span class="puntos">PC {{ mesa.pareja1?.jugador1?.PC || 0 }}</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="jugador">
-                      <span class="nombre">{{ mesa.pareja1?.jugador2?.nombre }} {{ mesa.pareja1?.jugador2?.apellidos }}</span>
-                      <span class="puntos">PG {{ mesa.pareja1?.jugador2?.PP || 150 }}</span>
+                      <div class="jugador-info">
+                        <span class="nombre">{{ mesa.pareja1?.jugador2?.nombre }} {{ mesa.pareja1?.jugador2?.apellidos }}</span>
+                        <div class="puntos-container">
+                          <span class="puntos">PG {{ mesa.pareja1?.jugador2?.PP || 150 }}</span>
+                          <span class="puntos">PC {{ mesa.pareja1?.jugador2?.PC || 0 }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div class="pareja-container">
                     <div class="jugador">
-                      <span class="nombre">{{ mesa.pareja2?.jugador1?.nombre }} {{ mesa.pareja2?.jugador1?.apellidos }}</span>
-                      <span class="puntos">PG {{ mesa.pareja2?.jugador1?.PP || 150 }}</span>
+                      <div class="jugador-info">
+                        <span class="nombre">{{ mesa.pareja2?.jugador1?.nombre }} {{ mesa.pareja2?.jugador1?.apellidos }}</span>
+                        <div class="puntos-container">
+                          <span class="puntos">PG {{ mesa.pareja2?.jugador1?.PP || 150 }}</span>
+                          <span class="puntos">PC {{ mesa.pareja2?.jugador1?.PC || 0 }}</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="jugador">
-                      <span class="nombre">{{ mesa.pareja2?.jugador2?.nombre }} {{ mesa.pareja2?.jugador2?.apellidos }}</span>
-                      <span class="puntos">PG {{ mesa.pareja2?.jugador2?.PP || 150 }}</span>
+                      <div class="jugador-info">
+                        <span class="nombre">{{ mesa.pareja2?.jugador2?.nombre }} {{ mesa.pareja2?.jugador2?.apellidos }}</span>
+                        <div class="puntos-container">
+                          <span class="puntos">PG {{ mesa.pareja2?.jugador2?.PP || 150 }}</span>
+                          <span class="puntos">PC {{ mesa.pareja2?.jugador2?.PC || 0 }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="lineas-container">
                 <div class="lineas-columna">
-                  <div v-for="n in 15" :key="n" class="linea">
-                    <span class="numero">{{ n }}</span>
-                    <div class="linea-contenido"></div>
-                  </div>
-                  <div class="columna">
-                    <div class="total">Total</div>
-                    <div class="firma">Firma</div>
+                  <div class="lineas-wrapper">
+                    <div class="lineas">
+                      <div v-for="n in 15" :key="n" class="linea">
+                        <span class="numero">{{ n }}</span>
+                        <div class="linea-contenido"></div>
+                      </div>
+                    </div>
+                    <div class="columna">
+                      <div class="total">Total</div>
+                      <div class="firma">Firma</div>
+                    </div>
                   </div>
                 </div>
                 <div class="lineas-columna">
-                  <div v-for="n in 15" :key="n" class="linea">
-                    <span class="numero">{{ n }}</span>
-                    <div class="linea-contenido"></div>
-                  </div>
-                  <div class="columna">
-                    <div class="total">Total</div>
-                    <div class="firma">Firma</div>
+                  <div class="lineas-wrapper">
+                    <div class="lineas">
+                      <div v-for="n in 15" :key="n" class="linea">
+                        <span class="numero">{{ n }}</span>
+                        <div class="linea-contenido"></div>
+                      </div>
+                    </div>
+                    <div class="columna">
+                      <div class="total">Total</div>
+                      <div class="firma">Firma</div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
             
-            <!-- Segunda mesa (si existe) -->
+            <!-- Segunda mesa de la página (si existe) -->
             <div v-if="index + 1 < mesasAplanadas.length" class="print-mesa">
               <div class="mesa-header">
                 <div class="header-top">
@@ -128,45 +156,73 @@
                 <div class="jugadores-grid">
                   <div class="pareja-container">
                     <div class="jugador">
-                      <span class="nombre">{{ mesasAplanadas[index + 1].pareja1?.jugador1?.nombre }} {{ mesasAplanadas[index + 1].pareja1?.jugador1?.apellidos }}</span>
-                      <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja1?.jugador1?.PP || 150 }}</span>
+                      <div class="jugador-info">
+                        <span class="nombre">{{ mesasAplanadas[index + 1].pareja1?.jugador1?.nombre }} {{ mesasAplanadas[index + 1].pareja1?.jugador1?.apellidos }}</span>
+                        <div class="puntos-container">
+                          <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja1?.jugador1?.PP || 150 }}</span>
+                          <span class="puntos">PC {{ mesasAplanadas[index + 1].pareja1?.jugador1?.PC || 0 }}</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="jugador">
-                      <span class="nombre">{{ mesasAplanadas[index + 1].pareja1?.jugador2?.nombre }} {{ mesasAplanadas[index + 1].pareja1?.jugador2?.apellidos }}</span>
-                      <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja1?.jugador2?.PP || 150 }}</span>
+                      <div class="jugador-info">
+                        <span class="nombre">{{ mesasAplanadas[index + 1].pareja1?.jugador2?.nombre }} {{ mesasAplanadas[index + 1].pareja1?.jugador2?.apellidos }}</span>
+                        <div class="puntos-container">
+                          <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja1?.jugador2?.PP || 150 }}</span>
+                          <span class="puntos">PC {{ mesasAplanadas[index + 1].pareja1?.jugador2?.PC || 0 }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div class="pareja-container">
                     <div class="jugador">
-                      <span class="nombre">{{ mesasAplanadas[index + 1].pareja2?.jugador1?.nombre }} {{ mesasAplanadas[index + 1].pareja2?.jugador1?.apellidos }}</span>
-                      <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja2?.jugador1?.PP || 150 }}</span>
+                      <div class="jugador-info">
+                        <span class="nombre">{{ mesasAplanadas[index + 1].pareja2?.jugador1?.nombre }} {{ mesasAplanadas[index + 1].pareja2?.jugador1?.apellidos }}</span>
+                        <div class="puntos-container">
+                          <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja2?.jugador1?.PP || 150 }}</span>
+                          <span class="puntos">PC {{ mesasAplanadas[index + 1].pareja2?.jugador1?.PC || 0 }}</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="jugador">
-                      <span class="nombre">{{ mesasAplanadas[index + 1].pareja2?.jugador2?.nombre }} {{ mesasAplanadas[index + 1].pareja2?.jugador2?.apellidos }}</span>
-                      <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja2?.jugador2?.PP || 150 }}</span>
+                      <div class="jugador-info">
+                        <span class="nombre">{{ mesasAplanadas[index + 1].pareja2?.jugador2?.nombre }} {{ mesasAplanadas[index + 1].pareja2?.jugador2?.apellidos }}</span>
+                        <div class="puntos-container">
+                          <span class="puntos">PG {{ mesasAplanadas[index + 1].pareja2?.jugador2?.PP || 150 }}</span>
+                          <span class="puntos">PC {{ mesasAplanadas[index + 1].pareja2?.jugador2?.PC || 0 }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="lineas-container">
                 <div class="lineas-columna">
-                  <div v-for="n in 15" :key="n" class="linea">
-                    <span class="numero">{{ n }}</span>
-                    <div class="linea-contenido"></div>
-                  </div>
-                  <div class="columna">
-                    <div class="total">Total</div>
-                    <div class="firma">Firma</div>
+                  <div class="lineas-wrapper">
+                    <div class="lineas">
+                      <div v-for="n in 15" :key="n" class="linea">
+                        <span class="numero">{{ n }}</span>
+                        <div class="linea-contenido"></div>
+                      </div>
+                    </div>
+                    <div class="columna">
+                      <div class="total">Total</div>
+                      <div class="firma">Firma</div>
+                    </div>
                   </div>
                 </div>
                 <div class="lineas-columna">
-                  <div v-for="n in 15" :key="n" class="linea">
-                    <span class="numero">{{ n }}</span>
-                    <div class="linea-contenido"></div>
-                  </div>
-                  <div class="columna">
-                    <div class="total">Total</div>
-                    <div class="firma">Firma</div>
+                  <div class="lineas-wrapper">
+                    <div class="lineas">
+                      <div v-for="n in 15" :key="n" class="linea">
+                        <span class="numero">{{ n }}</span>
+                        <div class="linea-contenido"></div>
+                      </div>
+                    </div>
+                    <div class="columna">
+                      <div class="total">Total</div>
+                      <div class="firma">Firma</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -367,9 +423,30 @@ const mesasAplanadas = computed(() => {
     }
   })
 
-  return Array.from(mesasMap.values())
+  // Convertir el Map a array y filtrar mesas completas
+  const mesasCompletas = Array.from(mesasMap.values())
     .filter(mesa => mesa.pareja1 && mesa.pareja2)
-    .sort((a, b) => a.numero - b.numero)
+
+  // Ordenar las mesas por número
+  const mesasOrdenadas = mesasCompletas.sort((a, b) => {
+    return parseInt(a.numero) - parseInt(b.numero)
+  })
+
+  // Agrupar las mesas en pares secuenciales
+  const mesasAgrupadas = []
+  for (let i = 0; i < mesasOrdenadas.length; i++) {
+    mesasAgrupadas.push(mesasOrdenadas[i])
+  }
+
+  // Asegurarnos de que las mesas estén en orden correcto
+  return mesasAgrupadas.sort((a, b) => {
+    const numA = parseInt(a.numero)
+    const numB = parseInt(b.numero)
+    if (Math.floor((numA - 1) / 2) === Math.floor((numB - 1) / 2)) {
+      return numA - numB
+    }
+    return Math.floor((numA - 1) / 2) - Math.floor((numB - 1) / 2)
+  })
 })
 
 const imprimirMesas = () => {
@@ -468,6 +545,87 @@ const imprimirMesas = () => {
 
   body {
     margin: 0;
+    background-color: white;
+  }
+
+  .print-container {
+    display: grid;
+    grid-template-columns: repeat(2, 130mm);
+    gap: 17mm;
+    padding: 15mm;
+    justify-content: center;
+    page-break-after: avoid;
+  }
+
+  .print-mesa {
+    height: 180mm;
+    border: 2px solid black;
+    display: flex;
+    flex-direction: column;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  .lineas-container {
+    margin: 0;
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    gap: 0;
+    padding: 0;
+    margin-bottom: -2px;
+  }
+
+  .lineas-columna {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin: 0;
+    border: 2px solid black;
+    padding: 3mm;
+    margin-bottom: 0;
+  }
+
+  .columna {
+    width: 100%;
+    margin-top: auto;
+    margin-bottom: 0;
+    padding-top: 2mm;
+  }
+
+  .total, .firma {
+    border-top: 1px solid black;
+    margin-top: 4px;
+    padding: 7px 0;
+    font-size: 12px;
+  }
+
+  .firma {
+    padding-top: 10px;
+  }
+
+  .lineas-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .lineas {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5px;
+    margin-bottom: 0;
+  }
+
+  .linea {
+    display: flex;
+    align-items: center;
+    height: 20px;
   }
 
   .print-only {
@@ -478,30 +636,13 @@ const imprimirMesas = () => {
     display: none !important;
   }
 
-  .print-container {
-    display: grid;
-    grid-template-columns: repeat(2, 130mm);
-    gap: 17mm;
-    padding: 15mm;
-    justify-content: center;
-  }
-
-  .print-mesa {
-    height: 180mm;
-    border: 2px solid black;
-    display: flex;
-    flex-direction: column;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
   .mesa-header {
     border-bottom: 2px solid black;
-    padding: 5mm;
+    padding: 4mm;
     display: flex;
     flex-direction: column;
-    height: 25mm;
-    margin-bottom: 0;
+    height: 24mm;
+    margin: 0;
   }
 
   .header-top {
@@ -524,14 +665,14 @@ const imprimirMesas = () => {
   }
 
   .mesa-header h1 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: bold;
     margin: 0;
   }
 
   .mesa-header h2 {
-    font-size: 16px;
-    margin: 5px 0 0 0;
+    font-size: 14px;
+    margin: 4px 0 0 0;
   }
 
   .mesa-info {
@@ -541,7 +682,7 @@ const imprimirMesas = () => {
 
   .parejas-container {
     margin-top: 0;
-    padding: 5mm;
+    padding: 0;
   }
 
   .jugadores-grid {
@@ -554,46 +695,33 @@ const imprimirMesas = () => {
   .pareja-container {
     width: 50%;
     border: 2px solid black;
-    padding: 5mm;
+    padding: 3mm;
+    margin: 0;
+    height: 19mm;
   }
 
   .jugador {
-    font-size: 14px;
+    margin-bottom: 2px;
+  }
+
+  .jugador-info {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 0;
+    flex-direction: column;
+    gap: 0;
   }
 
   .nombre {
     font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 0;
   }
 
-  .puntos {
-    margin-left: 10px;
-  }
-
-  .lineas-container {
-    margin-top: 0;
-    flex: 1;
+  .puntos-container {
     display: flex;
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .lineas-columna {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    margin-top: 5mm;
-  }
-
-  .linea {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px;
-    height: 20px;
+    gap: 15px;
+    margin-left: 15px;
+    font-size: 12px;
+    margin-top: 1px;
   }
 
   .numero {
@@ -606,17 +734,6 @@ const imprimirMesas = () => {
   .linea-contenido {
     flex: 1;
     border-bottom: 1px solid black;
-  }
-
-  .columna {
-    width: 48%;
-  }
-
-  .total, .firma {
-    border-top: 1px solid black;
-    margin-top: 3px;
-    padding: 3px 0;
-    font-size: 12px;
   }
 }
 </style> 
