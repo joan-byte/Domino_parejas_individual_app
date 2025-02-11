@@ -14,6 +14,7 @@ from app.schemas.pareja_partida import (
     ParejaNueva
 )
 from app.models.jugador import Jugador
+from app.models.campeonato import Campeonato
 
 router = APIRouter(
     prefix="/parejas-partida",
@@ -262,4 +263,30 @@ def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
             "tiene_registros": True
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/partidas/cerrar/{campeonato_id}/{partida}")
+async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Cierra una partida y actualiza la partida actual del campeonato"""
+    # Verificar que el campeonato existe
+    campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+    if not campeonato:
+        raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+    
+    # Verificar que la partida actual coincide
+    if campeonato.partida_actual != partida:
+        raise HTTPException(status_code=400, detail="La partida no coincide con la partida actual del campeonato")
+    
+    # Actualizar la partida actual del campeonato
+    nueva_partida = partida + 1
+    if nueva_partida <= campeonato.numero_partidas:
+        campeonato.partida_actual = nueva_partida
+    else:
+        campeonato.finalizado = True
+    
+    try:
+        db.commit()
+        return {"message": "Partida cerrada exitosamente", "nueva_partida": nueva_partida}
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e)) 

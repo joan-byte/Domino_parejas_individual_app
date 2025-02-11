@@ -27,6 +27,17 @@
               >
             </div>
             <div class="input-group">
+              <label for="mg-pareja1">MG:</label>
+              <input 
+                id="mg-pareja1"
+                name="mg-pareja1"
+                type="number" 
+                v-model="puntosPareja1.MG" 
+                min="0"
+                max="10"
+              >
+            </div>
+            <div class="input-group">
               <label for="pv-pareja1">PV:</label>
               <input 
                 id="pv-pareja1"
@@ -57,17 +68,6 @@
                 disabled
               >
             </div>
-            <div class="input-group">
-              <label for="mg-pareja1">MG:</label>
-              <input 
-                id="mg-pareja1"
-                name="mg-pareja1"
-                type="number" 
-                v-model="puntosPareja1.MG" 
-                min="0"
-                max="10"
-              >
-            </div>
           </div>
         </div>
 
@@ -93,6 +93,17 @@
                 min="0" 
                 max="600"
                 @input="calcularPuntos(2)"
+              >
+            </div>
+            <div class="input-group">
+              <label for="mg-pareja2">MG:</label>
+              <input 
+                id="mg-pareja2"
+                name="mg-pareja2"
+                type="number" 
+                v-model="puntosPareja2.MG" 
+                min="0"
+                max="10"
               >
             </div>
             <div class="input-group">
@@ -124,17 +135,6 @@
                 type="number" 
                 :value="puntosPareja2.PG" 
                 disabled
-              >
-            </div>
-            <div class="input-group">
-              <label for="mg-pareja2">MG:</label>
-              <input 
-                id="mg-pareja2"
-                name="mg-pareja2"
-                type="number" 
-                v-model="puntosPareja2.MG" 
-                min="0"
-                max="10"
               >
             </div>
           </div>

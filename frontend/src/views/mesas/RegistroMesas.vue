@@ -273,8 +273,19 @@ const cerrarPartida = async () => {
   if (!todasMesasRegistradas.value) return
 
   try {
+    // Primero obtener el estado actual del campeonato
+    const responseCampeonato = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
+    if (!responseCampeonato.ok) {
+      throw new Error('Error al obtener información del campeonato')
+    }
+    const campeonato = await responseCampeonato.json()
+    
+    // Actualizar el estado local con la información más reciente
+    campeonatoSeleccionado.value = campeonato
+    partidaActual.value = campeonato.partida_actual
+
     // 1. Cerrar la partida actual
-    const responseCierre = await fetch(`http://localhost:8000/api/partidas/cerrar/${campeonatoId}/${partidaActual.value}`, {
+    const responseCierre = await fetch(`http://localhost:8000/api/parejas-partida/partidas/cerrar/${campeonatoId}/${partidaActual.value}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -282,8 +293,12 @@ const cerrarPartida = async () => {
     })
 
     if (!responseCierre.ok) {
-      throw new Error('Error al cerrar la partida')
+      const errorData = await responseCierre.json()
+      throw new Error(errorData.detail || 'Error al cerrar la partida')
     }
+
+    const datosResponse = await responseCierre.json()
+    const nuevaPartida = datosResponse.nueva_partida
 
     // Si es la última partida, finalizar el campeonato
     if (esUltimaPartida.value) {
@@ -311,19 +326,25 @@ const cerrarPartida = async () => {
     const ranking = await responseRanking.json()
 
     // 3. Crear las nuevas parejas según el ranking
-    const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/parejas-partida/siguiente-partida/${campeonatoId}/${partidaActual.value}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    })
+    try {
+      const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/parejas-partida/siguiente-partida/${campeonatoId}/${partidaActual.value}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ranking })
+      })
 
-    if (!responseNuevasParejas.ok) {
-      throw new Error('Error al asignar nuevas parejas')
+      if (!responseNuevasParejas.ok) {
+        const errorData = await responseNuevasParejas.json()
+        throw new Error(errorData.detail || 'Error al asignar nuevas parejas')
+      }
+    } catch (error) {
+      console.error('Error al crear nuevas parejas:', error)
+      throw new Error('Error al asignar nuevas parejas: ' + error.message)
     }
 
     // 4. Actualizar el localStorage con la nueva partida
-    const nuevaPartida = partidaActual.value + 1
     const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
     if (campeonatoGuardado) {
       const campeonato = JSON.parse(campeonatoGuardado)
