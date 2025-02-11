@@ -42,3 +42,6 @@ Domino_App/
 # IDE
 .vscode/
 .idea/
+
+# Scripts de utilidad
+backend/scripts/

@@ -63,7 +63,7 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
             
             # Crear primera pareja
             pareja1 = ParejaPartida(
-                partida=1,
+                partida=1,  # Primera partida real
                 mesa=mesa,
                 jugador1_id=mesa_jugadores[0],
                 jugador2_id=mesa_jugadores[1],
@@ -73,7 +73,7 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
             
             # Crear segunda pareja
             pareja2 = ParejaPartida(
-                partida=1,
+                partida=1,  # Primera partida real
                 mesa=mesa,
                 jugador1_id=mesa_jugadores[2],
                 jugador2_id=mesa_jugadores[3],
@@ -83,6 +83,12 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
             
             parejas.extend([pareja1, pareja2])
             mesa += 1
+        
+        # Actualizar el campeonato a partida 1
+        campeonato = db.query(Campeonato).filter(Campeonato.id == sorteo.campeonato_id).first()
+        if not campeonato:
+            raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+        campeonato.partida_actual = 1  # Actualizar a primera partida real
         
         # Guardar todas las parejas en la base de datos
         for pareja in parejas:

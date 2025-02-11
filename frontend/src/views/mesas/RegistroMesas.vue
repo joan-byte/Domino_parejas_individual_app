@@ -3,17 +3,14 @@
     <div class="header">
       <h2>Registro de Mesas</h2>
       <div class="header-right">
-        <button 
-          class="btn-cerrar-partida" 
+        <div class="partida-info">Partida {{ partidaActual }}</div>
+        <button
+          class="btn-cerrar-partida"
           :disabled="!todasMesasRegistradas"
-          :title="!todasMesasRegistradas ? 'Todas las mesas deben tener resultados registrados' : 'Cerrar la partida actual'"
           @click="cerrarPartida"
         >
           {{ textoCerrarPartida }}
         </button>
-        <div class="partida-info">
-          <span>Partida: {{ partidaActual }}</span>
-        </div>
       </div>
     </div>
     
@@ -94,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ResultadoMesaPopup from '@/components/ResultadoMesaPopup.vue'
 
@@ -103,7 +100,7 @@ const router = useRouter()
 const campeonatoId = parseInt(route.params.campeonatoId)
 const mesas = ref([])
 const campeonatoSeleccionado = ref(null)
-const partidaActual = ref(1)
+const partidaActual = ref(0)
 const mesasRegistradas = ref({})
 const showPopup = ref(false)
 const mesaSeleccionada = ref(null)
@@ -121,10 +118,18 @@ const checkCampeonatoSeleccionado = () => {
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
   if (campeonatoGuardado) {
     campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
-    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 1
+    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 0
     console.log('Partida actual:', partidaActual.value)
   }
 }
+
+// Añadir un watcher para mantener sincronizada la partida actual
+watch(() => campeonatoSeleccionado.value?.partida_actual, (newPartida) => {
+  if (newPartida !== undefined) {
+    partidaActual.value = newPartida
+    console.log('Partida actual actualizada:', partidaActual.value)
+  }
+})
 
 const cargarMesas = async () => {
   try {
@@ -325,14 +330,17 @@ const cerrarPartida = async () => {
     }
     const ranking = await responseRanking.json()
 
-    // 3. Crear las nuevas parejas según el ranking
+    // 3. Crear las nuevas parejas según el ranking para la siguiente partida
     try {
       const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/parejas-partida/siguiente-partida/${campeonatoId}/${partidaActual.value}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ranking })
+        body: JSON.stringify({ 
+          ranking,
+          partida: nuevaPartida // Asegurarnos de usar la nueva partida
+        })
       })
 
       if (!responseNuevasParejas.ok) {
@@ -364,6 +372,36 @@ const cerrarPartida = async () => {
 onMounted(() => {
   checkCampeonatoSeleccionado()
   cargarMesas()
+
+  // Actualizar el estado del campeonato periódicamente
+  const intervalo = setInterval(async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
+      if (response.ok) {
+        const campeonato = await response.json()
+        if (campeonatoSeleccionado.value?.partida_actual !== campeonato.partida_actual) {
+          campeonatoSeleccionado.value = campeonato
+          localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+          await cargarMesas()
+        }
+      }
+    } catch (error) {
+      console.error('Error al actualizar estado del campeonato:', error)
+    }
+  }, 5000) // Actualizar cada 5 segundos
+
+  // Limpiar el intervalo cuando el componente se desmonte
+  onUnmounted(() => {
+    clearInterval(intervalo)
+  })
+})
+
+// Agregar el evento de storage para sincronización entre pestañas
+window.addEventListener('storage', async (event) => {
+  if (event.key === 'campeonatoSeleccionado') {
+    checkCampeonatoSeleccionado()
+    await cargarMesas()
+  }
 })
 </script>
 
