@@ -5,6 +5,7 @@ from app.db.base import get_db
 from app.models.resultado import Resultado
 from app.models.jugador import Jugador
 from app.models.pareja_partida import ParejaPartida
+from app.models.campeonato import Campeonato
 from app.schemas.resultado import ResultadoMesaInput, Resultado as ResultadoSchema
 from sqlalchemy.sql import func
 
@@ -12,15 +13,20 @@ router = APIRouter(
     tags=["resultados"]
 )
 
-def calcular_PV(PT: int) -> int:
-    """Calcula los Puntos Válidos (máximo 300)"""
-    return min(PT, 300)
+def calcular_PV(PT: int, PM: int) -> int:
+    """Calcula los Puntos Válidos (máximo PM del campeonato)"""
+    return min(PT, PM)
 
 @router.post("/resultados/mesa/", response_model=List[ResultadoSchema])
 def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_db)):
-    # Calcular PV para cada pareja
-    PV_pareja1 = calcular_PV(datos.puntos_pareja1)
-    PV_pareja2 = calcular_PV(datos.puntos_pareja2)
+    # Obtener el PM del campeonato
+    campeonato = db.query(Campeonato).filter(Campeonato.id == datos.campeonato_id).first()
+    if not campeonato:
+        raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+    
+    # Calcular PV para cada pareja usando el PM del campeonato
+    PV_pareja1 = calcular_PV(datos.puntos_pareja1, campeonato.PM)
+    PV_pareja2 = calcular_PV(datos.puntos_pareja2, campeonato.PM)
     
     # Calcular PC para cada pareja
     PC_pareja1 = PV_pareja1 - PV_pareja2
@@ -122,9 +128,14 @@ def update_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
     if not resultados:
         raise HTTPException(status_code=404, detail="No se encontraron resultados para actualizar")
     
-    # Calcular los nuevos valores
-    PV_pareja1 = calcular_PV(datos.puntos_pareja1)
-    PV_pareja2 = calcular_PV(datos.puntos_pareja2)
+    # Obtener el PM del campeonato
+    campeonato = db.query(Campeonato).filter(Campeonato.id == datos.campeonato_id).first()
+    if not campeonato:
+        raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+    
+    # Calcular los nuevos valores usando el PM del campeonato
+    PV_pareja1 = calcular_PV(datos.puntos_pareja1, campeonato.PM)
+    PV_pareja2 = calcular_PV(datos.puntos_pareja2, campeonato.PM)
     
     PC_pareja1 = PV_pareja1 - PV_pareja2
     PC_pareja2 = PV_pareja2 - PV_pareja1

@@ -48,6 +48,18 @@
         >
       </div>
 
+      <div class="form-group">
+        <label for="PM">Puntos Máximos</label>
+        <input 
+          type="number" 
+          id="PM" 
+          v-model.number="campeonato.PM"
+          required
+          min="0"
+          class="form-control"
+        >
+      </div>
+
       <div class="button-group">
         <button type="button" class="btn-secondary" @click="$router.push('/')">Cancelar</button>
         <button type="button" class="btn-primary" @click="guardarCambios">Guardar</button>
@@ -68,7 +80,8 @@ const campeonato = ref({
   nombre: '',
   fecha_inicio: '',
   dias_duracion: 1,
-  numero_partidas: 1
+  numero_partidas: 1,
+  PM: 300
 })
 
 const cargarCampeonato = async () => {

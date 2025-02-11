@@ -10,6 +10,7 @@ class Campeonato(Base):
     fecha_inicio = Column(Date, nullable=False)
     dias_duracion = Column(Integer, nullable=False)
     numero_partidas = Column(Integer, nullable=False)
+    PM = Column(Integer, nullable=False, default=300)  # Puntos Máximos
     activo = Column(Boolean, default=True)
     partida_actual = Column(Integer, default=0)
     finalizado = Column(Boolean, default=False)

@@ -167,7 +167,8 @@ const props = defineProps({
   mesa: Object,
   campeonatoId: Number,
   partida: Number,
-  resultadoExistente: Object
+  resultadoExistente: Object,
+  campeonato: Object
 })
 
 const emit = defineEmits(['update:show', 'resultadoGuardado'])
@@ -197,8 +198,8 @@ const calcularPuntos = (parejaNum) => {
   if (pareja.PT < 0) pareja.PT = 0
   if (pareja.PT > 600) pareja.PT = 600
   
-  // Calcular PV (máximo 300)
-  pareja.PV = Math.min(pareja.PT, 300)
+  // Calcular PV (máximo PM del campeonato)
+  pareja.PV = Math.min(pareja.PT, props.campeonato.PM)
   
   // Calcular PC (diferencia entre PV)
   pareja.PC = pareja.PV - parejaContraria.PV

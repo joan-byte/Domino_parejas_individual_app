@@ -85,6 +85,7 @@
       :campeonato-id="campeonatoId"
       :partida="partidaActual"
       :resultado-existente="resultadoExistente"
+      :campeonato="campeonatoSeleccionado"
       @resultado-guardado="onResultadoGuardado"
     />
   </div>
@@ -369,9 +370,23 @@ const cerrarPartida = async () => {
   }
 }
 
-onMounted(() => {
-  checkCampeonatoSeleccionado()
-  cargarMesas()
+const cargarCampeonato = async () => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
+    if (response.ok) {
+      const data = await response.json()
+      campeonatoSeleccionado.value = data
+      partidaActual.value = data.partida_actual || 0
+      console.log('Campeonato cargado:', data)
+    }
+  } catch (error) {
+    console.error('Error al cargar el campeonato:', error)
+  }
+}
+
+onMounted(async () => {
+  await cargarCampeonato()
+  await cargarMesas()
 
   // Actualizar el estado del campeonato periódicamente
   const intervalo = setInterval(async () => {

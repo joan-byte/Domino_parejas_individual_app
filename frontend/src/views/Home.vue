@@ -24,6 +24,7 @@
             <p><strong>Fecha de inicio:</strong> {{ formatDate(campeonato.fecha_inicio) }}</p>
             <p><strong>Duración:</strong> {{ campeonato.dias_duracion }} días</p>
             <p><strong>Partidas:</strong> {{ campeonato.numero_partidas }}</p>
+            <p><strong>Puntos Máximos:</strong> {{ campeonato.PM }}</p>
             <p><strong>Partida actual:</strong> {{ campeonato.partida_actual }}</p>
           </div>
           <div class="button-group">

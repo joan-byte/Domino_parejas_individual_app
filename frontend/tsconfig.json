@@ -18,7 +18,13 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+  "include": [
+    "src/views/**/*.vue",
+    "src/components/**/*.vue",
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx"
+  ],
   "exclude": ["node_modules"],
   "references": [
     {
