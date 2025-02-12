@@ -807,6 +807,12 @@ const imprimirMesas = async () => {
   .mesa-info {
     font-size: 14px;
     font-weight: bold;
+    display: flex;
+    gap: 15px;
+  }
+
+  .mesa-info span {
+    white-space: nowrap;
   }
 
   .parejas-container {
