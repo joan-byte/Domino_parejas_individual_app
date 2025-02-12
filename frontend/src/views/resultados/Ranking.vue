@@ -52,6 +52,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useEventBus } from '@vueuse/core'
 
 const parejas = ref([])
 const resultados = ref([])
@@ -61,6 +62,9 @@ const rankingData = ref([])
 const paginaActual = ref(0)
 const jugadoresPorPagina = 15
 let intervaloAutomatico = null
+
+// Crear el bus de eventos para actualizar el ranking
+const rankingBus = useEventBus('update-ranking')
 
 const totalPaginas = computed(() => {
   return Math.ceil(rankingData.value.length / jugadoresPorPagina)
@@ -72,12 +76,14 @@ const jugadoresPaginados = computed(() => {
   return rankingData.value.slice(inicio, fin)
 })
 
-const siguientePagina = () => {
+const siguientePagina = async () => {
   if (paginaActual.value < totalPaginas.value - 1) {
     paginaActual.value++
   } else {
     paginaActual.value = 0 // Volver al inicio
   }
+  // Actualizar datos al cambiar de página
+  await cargarRanking()
 }
 
 const iniciarPaginacionAutomatica = () => {
@@ -87,8 +93,8 @@ const iniciarPaginacionAutomatica = () => {
   }
   
   // Crear nuevo intervalo
-  intervaloAutomatico = setInterval(() => {
-    siguientePagina()
+  intervaloAutomatico = setInterval(async () => {
+    await siguientePagina()
   }, 10000) // 10 segundos
 }
 
@@ -99,6 +105,11 @@ watch(() => rankingData.value.length, (newValue) => {
   }
 })
 
+// Añadir un watcher para la página actual
+watch(() => paginaActual.value, async () => {
+  await cargarRanking()
+})
+
 const checkCampeonatoSeleccionado = () => {
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
   if (campeonatoGuardado) {
@@ -107,38 +118,56 @@ const checkCampeonatoSeleccionado = () => {
   }
 }
 
-const cargarDatos = async () => {
+const cargarRanking = async () => {
   try {
-    const response = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoSeleccionado.value.id}`)
-    if (response.ok) {
-      const data = await response.json()
-      rankingData.value = data
-    } else {
-      console.error('Error al cargar el ranking:', response.statusText)
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    if (!campeonatoGuardado) {
       rankingData.value = []
+      return
     }
+
+    const campeonato = JSON.parse(campeonatoGuardado)
+    partidaActual.value = campeonato.partida_actual || 1
+    
+    // Obtener el ranking
+    const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonato.id}`)
+    if (!rankingResponse.ok) {
+      throw new Error(`Error al obtener ranking: ${rankingResponse.status}`)
+    }
+    const data = await rankingResponse.json()
+    rankingData.value = data
   } catch (error) {
-    console.error('Error al cargar el ranking:', error)
+    console.error('Error al cargar los datos del ranking:', error)
     rankingData.value = []
   }
 }
 
-onMounted(() => {
+// Escuchar el evento de actualización
+rankingBus.on(() => {
+  cargarRanking()
+})
+
+onMounted(async () => {
   checkCampeonatoSeleccionado()
   window.addEventListener('storage', checkCampeonatoSeleccionado)
-  window.addEventListener('ranking-update', cargarDatos)
   
   // Cargar datos iniciales
-  cargarDatos()
+  await cargarRanking()
+  
+  // Iniciar la paginación automática solo si hay datos
+  if (rankingData.value.length > jugadoresPorPagina) {
+    iniciarPaginacionAutomatica()
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('storage', checkCampeonatoSeleccionado)
-  window.removeEventListener('ranking-update', cargarDatos)
   // Limpiar el intervalo cuando el componente se desmonte
   if (intervaloAutomatico) {
     clearInterval(intervaloAutomatico)
   }
+  // Limpiar el event bus
+  rankingBus.off()
 })
 </script>
 

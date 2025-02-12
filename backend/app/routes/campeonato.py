@@ -8,6 +8,8 @@ from app.schemas.campeonato import CampeonatoCreate, CampeonatoResponse, Campeon
 from app.models.resultado import Resultado
 from app.models.pareja_partida import ParejaPartida
 from app.models.jugador import Jugador
+from sqlalchemy.sql import text
+from sqlalchemy import and_
 
 router = APIRouter(
     prefix="/campeonatos",
@@ -23,33 +25,46 @@ async def read_campeonatos(db: Session = Depends(get_db)):
 def create_campeonato(campeonato: CampeonatoCreate, db: Session = Depends(get_db)):
     """Crear un nuevo campeonato"""
     try:
+        print(f"Intentando crear campeonato: {campeonato.dict()}")
+        
+        # Verificar si ya existe un campeonato con el mismo nombre y fecha usando SQLAlchemy
+        existing_campeonato = db.query(Campeonato).filter(
+            and_(
+                Campeonato.nombre == campeonato.nombre,
+                Campeonato.fecha_inicio == campeonato.fecha_inicio
+            )
+        ).first()
+        
+        if existing_campeonato:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ya existe un campeonato con el nombre '{campeonato.nombre}' en la fecha {campeonato.fecha_inicio}"
+            )
+
+        # Crear el nuevo campeonato usando SQLAlchemy
         db_campeonato = Campeonato(
             nombre=campeonato.nombre,
             fecha_inicio=campeonato.fecha_inicio,
             dias_duracion=campeonato.dias_duracion,
             numero_partidas=campeonato.numero_partidas,
+            PM=campeonato.PM,
             activo=True,
             partida_actual=0,
             finalizado=False
         )
+        
         db.add(db_campeonato)
         db.commit()
         db.refresh(db_campeonato)
+        
         return db_campeonato
-    except IntegrityError as e:
-        if 'ix_campeonatos_nombre' in str(e):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Ya existe un campeonato con el nombre '{campeonato.nombre}'"
-            )
-        raise HTTPException(
-            status_code=400,
-            detail="Error de integridad en la base de datos"
-        )
+        
     except Exception as e:
+        db.rollback()
+        print(f"Error inesperado: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Error interno del servidor"
+            detail=f"Error interno del servidor: {str(e)}"
         )
 
 @router.get("/{campeonato_id}", response_model=CampeonatoResponse)

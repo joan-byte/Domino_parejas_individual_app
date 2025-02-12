@@ -85,39 +85,92 @@ const campeonato = ref({
 
 const crearCampeonato = async () => {
   try {
+    // Validaciones iniciales
+    if (!campeonato.value.nombre || !campeonato.value.fecha_inicio || 
+        !campeonato.value.dias_duracion || !campeonato.value.numero_partidas) {
+      alert('Por favor, complete todos los campos requeridos');
+      return;
+    }
+
+    if (campeonato.value.dias_duracion <= 0 || campeonato.value.numero_partidas <= 0) {
+      alert('La duración y el número de partidas deben ser mayores que 0');
+      return;
+    }
+
+    const nombreLimpio = campeonato.value.nombre.trim();
+    if (nombreLimpio === '') {
+      alert('El nombre del campeonato no puede estar vacío');
+      return;
+    }
+
+    // Verificar campeonatos existentes
+    const verificarResponse = await fetch(`http://localhost:8000/api/campeonatos/`);
+    if (!verificarResponse.ok) {
+      throw new Error('Error al verificar campeonatos existentes');
+    }
+    const campeonatosExistentes = await verificarResponse.json();
+    
+    // Formatear la fecha de inicio para la comparación
+    const fechaInicio = new Date(campeonato.value.fecha_inicio);
+    const fechaInicioStr = fechaInicio.toISOString().split('T')[0];
+    
+    console.log('Fecha a enviar:', fechaInicioStr);
+    console.log('Campeonatos existentes:', campeonatosExistentes);
+    
+    // Buscar campeonatos con el mismo nombre y fecha
+    const campeonatoExistente = campeonatosExistentes.find(c => {
+      const fechaExistente = new Date(c.fecha_inicio).toISOString().split('T')[0];
+      console.log(`Comparando "${nombreLimpio}" con "${c.nombre}" y fecha ${fechaExistente}`);
+      return c.nombre.toLowerCase() === nombreLimpio.toLowerCase() && 
+             fechaExistente === fechaInicioStr;
+    });
+
+    if (campeonatoExistente) {
+      const fechaFormateada = new Date(campeonatoExistente.fecha_inicio).toLocaleDateString();
+      alert(`Ya existe un campeonato con el nombre "${nombreLimpio}" en la fecha ${fechaFormateada}`);
+      return;
+    }
+
+    // Si no hay duplicados exactos, proceder con la creación
+    const datosCampeonato = {
+      nombre: nombreLimpio,
+      fecha_inicio: fechaInicioStr,
+      dias_duracion: parseInt(campeonato.value.dias_duracion),
+      numero_partidas: parseInt(campeonato.value.numero_partidas),
+      PM: parseInt(campeonato.value.PM || 300)
+    };
+
+    console.log('Datos completos a enviar:', JSON.stringify(datosCampeonato, null, 2));
+
     const response = await fetch('http://localhost:8000/api/campeonatos/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        nombre: campeonato.value.nombre,
-        fecha_inicio: campeonato.value.fecha_inicio,
-        dias_duracion: parseInt(campeonato.value.dias_duracion),
-        numero_partidas: parseInt(campeonato.value.numero_partidas),
-        PM: parseInt(campeonato.value.PM)
-      })
+      body: JSON.stringify(datosCampeonato)
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.detail || 'Error al crear el campeonato');
+      console.error('Error response completo:', errorData);
+      console.error('Status:', response.status);
+      
+      if (errorData.detail === 'Error de integridad en la base de datos') {
+        alert('Ya existe un campeonato con el mismo nombre y fecha. Por favor, elige una fecha diferente o cambia el nombre.');
+      } else {
+        throw new Error(errorData.detail || 'Error al crear el campeonato');
+      }
+      return;
     }
 
     const data = await response.json();
+    console.log('Respuesta exitosa:', data);
     
-    // Guardar el campeonato seleccionado en localStorage
     localStorage.setItem('campeonatoSeleccionado', JSON.stringify(data));
-    
-    // Mostrar mensaje de éxito
     alert('Campeonato creado exitosamente');
-    
-    // Redirigir a inicio y recargar la página
-    router.push('/').then(() => {
-      window.location.reload();
-    });
+    router.push('/');
   } catch (error) {
-    console.error('Error al crear el campeonato:', error);
+    console.error('Error completo:', error);
     alert(error.message || 'Error al crear el campeonato');
   }
 };

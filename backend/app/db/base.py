@@ -16,7 +16,11 @@ from app.models.pareja_partida import ParejaPartida
 
 # Crear el motor de la base de datos
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={"options": "-c timezone=utc"}
+)
 
 # Crear la sesión
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

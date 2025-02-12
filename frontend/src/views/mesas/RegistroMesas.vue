@@ -83,94 +83,47 @@
       v-model:show="showPopup"
       :mesa="mesaSeleccionada"
       :campeonato-id="campeonatoId"
-      :partida="partidaActual"
+      :partida-actual="partidaActual"
       :resultado-existente="resultadoExistente"
-      :campeonato="campeonatoSeleccionado"
-      @resultado-guardado="onResultadoGuardado"
+      @close="cerrarPopup"
+      @resultado-registrado="onResultadoRegistrado"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useEventBus } from '@vueuse/core'
 import ResultadoMesaPopup from '@/components/ResultadoMesaPopup.vue'
+import router from '@/router'
 
 const route = useRoute()
-const router = useRouter()
 const campeonatoId = parseInt(route.params.campeonatoId)
 const mesas = ref([])
-const campeonatoSeleccionado = ref(null)
-const partidaActual = ref(0)
 const mesasRegistradas = ref({})
-const showPopup = ref(false)
+const campeonatoSeleccionado = ref(null)
+const partidaActual = ref(1)
 const mesaSeleccionada = ref(null)
+const showPopup = ref(false)
+const esUltimaPartida = ref(false)
 const resultadoExistente = ref(null)
-const esUltimaPartida = computed(() => {
-  return campeonatoSeleccionado.value && 
-         partidaActual.value === campeonatoSeleccionado.value.numero_partidas
-})
 
-const textoCerrarPartida = computed(() => {
-  return esUltimaPartida.value ? 'Cerrar Campeonato' : 'Cerrar Partida'
-})
+// Crear el bus de eventos para actualizar el ranking
+const rankingBus = useEventBus('update-ranking')
 
-const checkCampeonatoSeleccionado = () => {
-  const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
-  if (campeonatoGuardado) {
-    campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
-    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 0
-    console.log('Partida actual:', partidaActual.value)
-  }
+const abrirRegistro = (mesa) => {
+  mesaSeleccionada.value = mesa
+  showPopup.value = true
 }
 
-// Añadir un watcher para mantener sincronizada la partida actual
-watch(() => campeonatoSeleccionado.value?.partida_actual, (newPartida) => {
-  if (newPartida !== undefined) {
-    partidaActual.value = newPartida
-    console.log('Partida actual actualizada:', partidaActual.value)
-  }
-})
+const cerrarPopup = () => {
+  showPopup.value = false
+  mesaSeleccionada.value = null
+}
 
-const cargarMesas = async () => {
-  try {
-    console.log('Cargando mesas para partida:', partidaActual.value)
-    const response = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
-    if (response.ok) {
-      const parejas = await response.json()
-      console.log('Parejas recibidas:', parejas)
-      
-      // Agrupar parejas por mesa
-      const mesasTemp = []
-      const mesasProcesadas = new Set()
-      
-      parejas.forEach(pareja => {
-        if (!mesasProcesadas.has(pareja.mesa)) {
-          const pareja1 = parejas.find(p => p.mesa === pareja.mesa && p.numero_pareja === 1)
-          const pareja2 = parejas.find(p => p.mesa === pareja.mesa && p.numero_pareja === 2)
-          
-          if (pareja1 && pareja2) {
-            mesasTemp.push({
-              numeroMesa: pareja.mesa,
-              pareja1,
-              pareja2
-            })
-            mesasProcesadas.add(pareja.mesa)
-          }
-        }
-      })
-      
-      console.log('Mesas procesadas:', mesasTemp)
-      mesas.value = mesasTemp
-      await verificarMesasRegistradas()
-    } else {
-      console.error('Error al cargar las mesas:', response.statusText)
-      mesas.value = []
-    }
-  } catch (error) {
-    console.error('Error al cargar las mesas:', error)
-    mesas.value = []
-  }
+const onResultadoRegistrado = () => {
+  verificarMesasRegistradas()
 }
 
 const verificarMesasRegistradas = async () => {
@@ -190,24 +143,49 @@ const verificarMesasRegistradas = async () => {
   }
 }
 
-const mesasConParejas = computed(() => {
-  if (!mesas.value || !Array.isArray(mesas.value)) {
-    return []
-  }
-  
-  const mesasMap = new Map()
-  
-  mesas.value.forEach(mesa => {
-    if (!mesasMap.has(mesa.numeroMesa)) {
-      mesasMap.set(mesa.numeroMesa, {
-        numeroMesa: mesa.numeroMesa,
-        pareja1: mesa.pareja1,
-        pareja2: mesa.pareja2
-      })
+const cargarMesas = async () => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    if (!response.ok) {
+      throw new Error(`Error al cargar las mesas: ${response.statusText}`)
     }
-  })
-  
-  return Array.from(mesasMap.values())
+    const data = await response.json()
+    
+    // Procesar los datos para agrupar las parejas por mesa
+    const mesasTemp = new Map()
+    
+    data.forEach(pareja => {
+      const mesaNum = pareja.mesa
+      if (!mesasTemp.has(mesaNum)) {
+        mesasTemp.set(mesaNum, {
+          numeroMesa: mesaNum,
+          pareja1: null,
+          pareja2: null
+        })
+      }
+      
+      const mesa = mesasTemp.get(mesaNum)
+      if (pareja.numero_pareja === 1) {
+        mesa.pareja1 = pareja
+      } else if (pareja.numero_pareja === 2) {
+        mesa.pareja2 = pareja
+      }
+    })
+    
+    // Convertir el Map a un array y filtrar mesas incompletas
+    mesas.value = Array.from(mesasTemp.values())
+      .filter(mesa => mesa.pareja1 && mesa.pareja2)
+      .sort((a, b) => a.numeroMesa - b.numeroMesa)
+    
+    await verificarMesasRegistradas()
+  } catch (error) {
+    console.error('Error al cargar las mesas:', error)
+    mesas.value = []
+  }
+}
+
+const mesasConParejas = computed(() => {
+  return mesas.value || []
 })
 
 const todasMesasRegistradas = computed(() => {
@@ -240,12 +218,6 @@ const cargarResultadoMesa = async (mesa) => {
     console.error('Error al cargar resultado de mesa:', error)
   }
   return null
-}
-
-const abrirRegistro = (mesa) => {
-  mesaSeleccionada.value = mesa
-  resultadoExistente.value = null
-  showPopup.value = true
 }
 
 const abrirModificacion = async (mesa) => {
@@ -289,6 +261,7 @@ const cerrarPartida = async () => {
     // Actualizar el estado local con la información más reciente
     campeonatoSeleccionado.value = campeonato
     partidaActual.value = campeonato.partida_actual
+    esUltimaPartida.value = partidaActual.value === campeonato.numero_partidas
 
     // 1. Cerrar la partida actual
     const responseCierre = await fetch(`http://localhost:8000/api/parejas-partida/partidas/cerrar/${campeonatoId}/${partidaActual.value}`, {
@@ -370,53 +343,28 @@ const cerrarPartida = async () => {
   }
 }
 
-const cargarCampeonato = async () => {
-  try {
-    const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
-    if (response.ok) {
-      const data = await response.json()
-      campeonatoSeleccionado.value = data
-      partidaActual.value = data.partida_actual || 0
-      console.log('Campeonato cargado:', data)
-    }
-  } catch (error) {
-    console.error('Error al cargar el campeonato:', error)
-  }
-}
-
 onMounted(async () => {
-  await cargarCampeonato()
-  await cargarMesas()
-
-  // Actualizar el estado del campeonato periódicamente
-  const intervalo = setInterval(async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
-      if (response.ok) {
-        const campeonato = await response.json()
-        if (campeonatoSeleccionado.value?.partida_actual !== campeonato.partida_actual) {
-          campeonatoSeleccionado.value = campeonato
-          localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
-          await cargarMesas()
-        }
-      }
-    } catch (error) {
-      console.error('Error al actualizar estado del campeonato:', error)
-    }
-  }, 5000) // Actualizar cada 5 segundos
-
-  // Limpiar el intervalo cuando el componente se desmonte
-  onUnmounted(() => {
-    clearInterval(intervalo)
-  })
+  const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+  if (campeonatoGuardado) {
+    const campeonato = JSON.parse(campeonatoGuardado)
+    campeonatoSeleccionado.value = campeonato
+    partidaActual.value = campeonato.partida_actual || 1
+    esUltimaPartida.value = partidaActual.value === campeonato.numero_partidas
+    await cargarMesas()
+  } else {
+    console.error('No hay campeonato seleccionado')
+  }
 })
 
-// Agregar el evento de storage para sincronización entre pestañas
-window.addEventListener('storage', async (event) => {
-  if (event.key === 'campeonatoSeleccionado') {
-    checkCampeonatoSeleccionado()
-    await cargarMesas()
+// Limpiar el event bus cuando el componente se desmonta
+onUnmounted(() => {
+  if (rankingBus) {
+    rankingBus.off()
   }
+})
+
+const textoCerrarPartida = computed(() => {
+  return esUltimaPartida.value ? 'Cerrar Campeonato' : 'Cerrar Partida'
 })
 </script>
 

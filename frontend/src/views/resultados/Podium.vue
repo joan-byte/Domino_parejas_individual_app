@@ -97,6 +97,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useEventBus } from '@vueuse/core'
 
 const tournamentName = ref('')
 const ranking = ref([])
@@ -104,20 +105,10 @@ const firstPlace = ref(null)
 const secondPlace = ref(null)
 const thirdPlace = ref(null)
 
-const getMedalEmoji = (index) => {
-  switch (index) {
-    case 0:
-      return '🏆'
-    case 1:
-      return '🥈'
-    case 2:
-      return '🥉'
-    default:
-      return ''
-  }
-}
+// Crear el bus de eventos para actualizar el ranking
+const rankingBus = useEventBus('update-ranking')
 
-onMounted(async () => {
+const loadRanking = async () => {
   try {
     // Obtener el campeonato activo
     const campeonatoResponse = await fetch('http://localhost:8000/api/campeonatos/')
@@ -162,7 +153,29 @@ onMounted(async () => {
   } catch (error) {
     console.error('Error al cargar los datos:', error.message)
   }
+}
+
+// Escuchar el evento de actualización
+rankingBus.on(() => {
+  loadRanking()
 })
+
+onMounted(() => {
+  loadRanking()
+})
+
+const getMedalEmoji = (index) => {
+  switch (index) {
+    case 0:
+      return '🏆'
+    case 1:
+      return '🥈'
+    case 2:
+      return '🥉'
+    default:
+      return ''
+  }
+}
 </script>
 
 <style scoped>

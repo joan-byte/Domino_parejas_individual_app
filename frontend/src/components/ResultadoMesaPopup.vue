@@ -34,7 +34,7 @@
                 type="number" 
                 v-model="puntosPareja1.MG" 
                 min="0"
-                max="10"
+                max="20"
               >
             </div>
             <div class="input-group">
@@ -103,7 +103,7 @@
                 type="number" 
                 v-model="puntosPareja2.MG" 
                 min="0"
-                max="10"
+                max="20"
               >
             </div>
             <div class="input-group">
@@ -161,17 +161,20 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { useEventBus } from '@vueuse/core'
 
 const props = defineProps({
   show: Boolean,
   mesa: Object,
   campeonatoId: Number,
-  partida: Number,
-  resultadoExistente: Object,
-  campeonato: Object
+  partidaActual: {
+    type: Number,
+    required: true
+  },
+  resultadoExistente: Object
 })
 
-const emit = defineEmits(['update:show', 'resultadoGuardado'])
+const emit = defineEmits(['close', 'resultadoRegistrado'])
 
 const puntosPareja1 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
 const puntosPareja2 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
@@ -180,6 +183,9 @@ const pvIguales = computed(() => {
   return puntosPareja1.value.PV === puntosPareja2.value.PV && 
          puntosPareja1.value.PV !== 0
 })
+
+// Crear el bus de eventos para actualizar el ranking
+const rankingBus = useEventBus('update-ranking')
 
 watch(() => props.resultadoExistente, (newVal) => {
   if (newVal) {
@@ -198,8 +204,8 @@ const calcularPuntos = (parejaNum) => {
   if (pareja.PT < 0) pareja.PT = 0
   if (pareja.PT > 600) pareja.PT = 600
   
-  // Calcular PV (máximo PM del campeonato)
-  pareja.PV = Math.min(pareja.PT, props.campeonato.PM)
+  // Calcular PV (máximo 300)
+  pareja.PV = Math.min(pareja.PT, 300)
   
   // Calcular PC (diferencia entre PV)
   pareja.PC = pareja.PV - parejaContraria.PV
@@ -210,48 +216,132 @@ const calcularPuntos = (parejaNum) => {
   parejaContraria.PG = parejaContraria.PC > 0 ? 1 : 0
 }
 
-const guardarResultados = async () => {
-  if (pvIguales.value) return
+const validarPuntos = () => {
+  // Validar que los puntos totales estén dentro del rango
+  if (puntosPareja1.value.PT < 0 || puntosPareja1.value.PT > 600 ||
+      puntosPareja2.value.PT < 0 || puntosPareja2.value.PT > 600) {
+    return false
+  }
 
-  const datos = {
-    campeonato_id: props.campeonatoId,
-    partida: props.partida,
-    mesa: props.mesa.numeroMesa,
-    jugador1_id: props.mesa.pareja1.jugador1_id,
-    jugador2_id: props.mesa.pareja1.jugador2_id,
-    jugador3_id: props.mesa.pareja2.jugador1_id,
-    jugador4_id: props.mesa.pareja2.jugador2_id,
-    puntos_pareja1: puntosPareja1.value.PT,
-    puntos_pareja2: puntosPareja2.value.PT,
-    mesas_ganadas_pareja1: puntosPareja1.value.MG,
-    mesas_ganadas_pareja2: puntosPareja2.value.MG
+  // Validar que las manos ganadas estén dentro del rango (0-20)
+  if (puntosPareja1.value.MG < 0 || puntosPareja1.value.MG > 20 ||
+      puntosPareja2.value.MG < 0 || puntosPareja2.value.MG > 20) {
+    return false
+  }
+
+  // Validar que los PV no sean iguales
+  if (puntosPareja1.value.PV === puntosPareja2.value.PV && 
+      puntosPareja1.value.PV !== 0) {
+    return false
+  }
+
+  return true
+}
+
+const guardarResultados = async () => {
+  if (!validarPuntos()) {
+    alert('Por favor, verifica los puntos ingresados.')
+    return
   }
 
   try {
-    const url = 'http://localhost:8000/api/resultados/mesa/'
-    const method = props.resultadoExistente ? 'PUT' : 'POST'
-    
-    const response = await fetch(url, {
-      method,
+    // Log de los props recibidos
+    console.log('Props recibidos:', {
+      campeonatoId: props.campeonatoId,
+      partidaActual: props.partidaActual,
+      mesa: props.mesa?.numeroMesa
+    })
+
+    // Asegurarnos de que todos los valores son números enteros
+    const datos = {
+      campeonato_id: parseInt(props.campeonatoId),
+      partida: parseInt(props.partidaActual),
+      mesa: parseInt(props.mesa.numeroMesa),
+      jugador1_id: parseInt(props.mesa.pareja1.jugador1_id),
+      jugador2_id: parseInt(props.mesa.pareja1.jugador2_id),
+      jugador3_id: parseInt(props.mesa.pareja2.jugador1_id),
+      jugador4_id: parseInt(props.mesa.pareja2.jugador2_id),
+      puntos_pareja1: parseInt(puntosPareja1.value.PT) || 0,
+      puntos_pareja2: parseInt(puntosPareja2.value.PT) || 0,
+      mesas_ganadas_pareja1: parseInt(puntosPareja1.value.MG) || 0,
+      mesas_ganadas_pareja2: parseInt(puntosPareja2.value.MG) || 0
+    }
+
+    // Log de los datos antes de la validación
+    console.log('Datos antes de validación:', {
+      ...datos,
+      props: {
+        campeonatoId: props.campeonatoId,
+        partidaActual: props.partidaActual,
+        mesa: props.mesa
+      }
+    })
+
+    // Validar que todos los campos requeridos estén presentes y sean números
+    const camposRequeridos = [
+      'campeonato_id', 'partida', 'mesa', 
+      'jugador1_id', 'jugador2_id', 'jugador3_id', 'jugador4_id',
+      'puntos_pareja1', 'puntos_pareja2', 
+      'mesas_ganadas_pareja1', 'mesas_ganadas_pareja2'
+    ]
+
+    const camposFaltantes = camposRequeridos.filter(campo => {
+      const valor = datos[campo]
+      const esInvalido = valor === undefined || valor === null || isNaN(valor)
+      if (esInvalido) {
+        console.log(`Campo inválido ${campo}:`, valor)
+      }
+      return esInvalido
+    })
+
+    if (camposFaltantes.length > 0) {
+      throw new Error(`Campos inválidos o faltantes: ${camposFaltantes.join(', ')}`)
+    }
+
+    console.log('Datos a enviar:', JSON.stringify(datos, null, 2))
+
+    const response = await fetch('http://localhost:8000/api/resultados/mesa/', {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(datos)
     })
+
+    const responseData = await response.json()
     
-    if (response.ok) {
-      // Emitir el evento con los datos actualizados
-      emit('resultadoGuardado', {
-        mesa: props.mesa.numeroMesa,
-        registrado: true
-      })
-      // Cerrar el popup
-      emit('update:show', false)
-    } else {
-      console.error('Error al guardar resultados')
+    if (!response.ok) {
+      console.error('Error response status:', response.status)
+      console.error('Error response data:', responseData)
+      
+      let mensajeError = 'Error al guardar los resultados'
+      if (responseData.detail) {
+        if (Array.isArray(responseData.detail)) {
+          mensajeError = responseData.detail.join(', ')
+        } else {
+          mensajeError = responseData.detail
+        }
+      }
+      
+      throw new Error(mensajeError)
     }
+
+    console.log('Resultados guardados correctamente')
+    
+    // Emitir el evento para actualizar el ranking
+    rankingBus.emit()
+    console.log('Evento de actualización de ranking emitido')
+    
+    // Esperar un momento antes de cerrar para asegurar que el evento se procese
+    setTimeout(() => {
+      emit('resultadoRegistrado')
+      emit('close')
+    }, 100)
+
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error completo:', error)
+    console.error('Stack trace:', error.stack)
+    alert('Error al guardar los resultados: ' + error.message)
   }
 }
 
@@ -262,7 +352,7 @@ const limpiarCampos = () => {
 
 const cerrar = () => {
   limpiarCampos()
-  emit('update:show', false)
+  emit('close')
 }
 
 // Limpiar campos cuando se cierra el popup
