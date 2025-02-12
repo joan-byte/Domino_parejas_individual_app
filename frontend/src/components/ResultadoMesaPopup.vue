@@ -9,6 +9,7 @@
             <div class="jugador">
               {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
             </div>
+            <div class="jugador-separator">y</div>
             <div class="jugador">
               {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
             </div>
@@ -78,6 +79,7 @@
             <div class="jugador">
               {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
             </div>
+            <div class="jugador-separator">y</div>
             <div class="jugador">
               {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
             </div>
@@ -407,6 +409,9 @@ watch(() => props.show, (newVal) => {
 
 .pareja-info {
   margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .jugador {
@@ -416,6 +421,17 @@ watch(() => props.show, (newVal) => {
   background-color: white;
   border-radius: 4px;
   border: 1px solid #e0e0e0;
+  width: 100%;
+}
+
+.jugador-separator {
+  font-size: 1.1em;
+  margin: 0.25rem 0;
+  color: #666;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .puntos-row {

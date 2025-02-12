@@ -28,7 +28,7 @@
                 <span class="jugador">
                   {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
                 </span>
-                <span class="jugador-separator">,</span>
+                <span class="jugador-separator">y</span>
                 <span class="jugador">
                   {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
                 </span>
@@ -41,7 +41,7 @@
                 <span class="jugador">
                   {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
                 </span>
-                <span class="jugador-separator">,</span>
+                <span class="jugador-separator">y</span>
                 <span class="jugador">
                   {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
                 </span>
@@ -548,21 +548,29 @@ button:disabled {
 .jugadores {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
 }
 
 .jugador {
+  flex: 1;
   padding: 0.5rem;
   background-color: white;
   border-radius: 4px;
   border: 1px solid #e0e0e0;
   font-size: 1em;
   white-space: nowrap;
+  text-align: center;
 }
 
 .jugador-separator {
   color: #666;
   font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 1rem;
+  flex-shrink: 0;
 }
 </style> 
