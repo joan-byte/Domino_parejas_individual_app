@@ -13,7 +13,7 @@
           <th>Ranking</th>
           <th>Partida</th>
           <th>PG</th>
-          <th>PC</th>
+          <th>Dif.</th>
           <th>PT</th>
           <th>MG</th>
           <th>ID</th>

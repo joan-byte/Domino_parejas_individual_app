@@ -13,7 +13,7 @@
           <div class="stats">
             <div class="stat-row">
               <span>PG: {{ secondPlace?.PG || '0' }}</span>
-              <span>PC: {{ secondPlace?.PC || '0' }}</span>
+              <span>Dif.: {{ secondPlace?.PC || '0' }}</span>
             </div>
             <div class="stat-row">
               <span>PT: {{ secondPlace?.PT || '0' }}</span>
@@ -31,7 +31,7 @@
           <div class="stats">
             <div class="stat-row">
               <span>PG: {{ firstPlace?.PG || '0' }}</span>
-              <span>PC: {{ firstPlace?.PC || '0' }}</span>
+              <span>Dif.: {{ firstPlace?.PC || '0' }}</span>
             </div>
             <div class="stat-row">
               <span>PT: {{ firstPlace?.PT || '0' }}</span>
@@ -49,7 +49,7 @@
           <div class="stats">
             <div class="stat-row">
               <span>PG: {{ thirdPlace?.PG || '0' }}</span>
-              <span>PC: {{ thirdPlace?.PC || '0' }}</span>
+              <span>Dif.: {{ thirdPlace?.PC || '0' }}</span>
             </div>
             <div class="stat-row">
               <span>PT: {{ thirdPlace?.PT || '0' }}</span>
@@ -68,7 +68,7 @@
           <tr>
             <th>POSICIÓN</th>
             <th>PG</th>
-            <th>PC</th>
+            <th>Dif.</th>
             <th>PT</th>
             <th>MG</th>
             <th>ID</th>

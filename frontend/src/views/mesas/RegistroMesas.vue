@@ -28,20 +28,20 @@
                 <span class="jugador">
                   {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
                 </span>
-                <span class="jugador-separator">y</span>
+                <span class="jugador-separator">/</span>
                 <span class="jugador">
                   {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
                 </span>
               </div>
             </div>
-            <div class="separator">y</div>
+            <div class="separator">vs</div>
             <div class="pareja-info">
               <span class="pareja-label">Pareja 2:</span>
               <div class="jugadores">
                 <span class="jugador">
                   {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
                 </span>
-                <span class="jugador-separator">y</span>
+                <span class="jugador-separator">/</span>
                 <span class="jugador">
                   {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
                 </span>

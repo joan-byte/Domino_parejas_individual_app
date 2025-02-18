@@ -67,7 +67,7 @@
                       <span class="nombre">{{ pagina.mesa1.pareja1?.jugador1?.nombre }} {{ pagina.mesa1.pareja1?.jugador1?.apellidos }}</span>
                       <div class="puntos-container">
                         <span class="puntos">PG {{ pagina.mesa1.pareja1?.jugador1?.PG || 0 }}</span>
-                        <span class="puntos">PC {{ pagina.mesa1.pareja1?.jugador1?.PC || 0 }}</span>
+                        <span class="puntos">Dif. {{ pagina.mesa1.pareja1?.jugador1?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
@@ -76,7 +76,7 @@
                       <span class="nombre">{{ pagina.mesa1.pareja1?.jugador2?.nombre }} {{ pagina.mesa1.pareja1?.jugador2?.apellidos }}</span>
                       <div class="puntos-container">
                         <span class="puntos">PG {{ pagina.mesa1.pareja1?.jugador2?.PG || 0 }}</span>
-                        <span class="puntos">PC {{ pagina.mesa1.pareja1?.jugador2?.PC || 0 }}</span>
+                        <span class="puntos">Dif. {{ pagina.mesa1.pareja1?.jugador2?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
@@ -87,7 +87,7 @@
                       <span class="nombre">{{ pagina.mesa1.pareja2?.jugador1?.nombre }} {{ pagina.mesa1.pareja2?.jugador1?.apellidos }}</span>
                       <div class="puntos-container">
                         <span class="puntos">PG {{ pagina.mesa1.pareja2?.jugador1?.PG || 0 }}</span>
-                        <span class="puntos">PC {{ pagina.mesa1.pareja2?.jugador1?.PC || 0 }}</span>
+                        <span class="puntos">Dif. {{ pagina.mesa1.pareja2?.jugador1?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
@@ -96,7 +96,7 @@
                       <span class="nombre">{{ pagina.mesa1.pareja2?.jugador2?.nombre }} {{ pagina.mesa1.pareja2?.jugador2?.apellidos }}</span>
                       <div class="puntos-container">
                         <span class="puntos">PG {{ pagina.mesa1.pareja2?.jugador2?.PG || 0 }}</span>
-                        <span class="puntos">PC {{ pagina.mesa1.pareja2?.jugador2?.PC || 0 }}</span>
+                        <span class="puntos">Dif. {{ pagina.mesa1.pareja2?.jugador2?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
@@ -159,7 +159,7 @@
                       <span class="nombre">{{ pagina.mesa2.pareja1?.jugador1?.nombre }} {{ pagina.mesa2.pareja1?.jugador1?.apellidos }}</span>
                       <div class="puntos-container">
                         <span class="puntos">PG {{ pagina.mesa2.pareja1?.jugador1?.PG || 0 }}</span>
-                        <span class="puntos">PC {{ pagina.mesa2.pareja1?.jugador1?.PC || 0 }}</span>
+                        <span class="puntos">Dif. {{ pagina.mesa2.pareja1?.jugador1?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
@@ -168,7 +168,7 @@
                       <span class="nombre">{{ pagina.mesa2.pareja1?.jugador2?.nombre }} {{ pagina.mesa2.pareja1?.jugador2?.apellidos }}</span>
                       <div class="puntos-container">
                         <span class="puntos">PG {{ pagina.mesa2.pareja1?.jugador2?.PG || 0 }}</span>
-                        <span class="puntos">PC {{ pagina.mesa2.pareja1?.jugador2?.PC || 0 }}</span>
+                        <span class="puntos">Dif. {{ pagina.mesa2.pareja1?.jugador2?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
@@ -179,7 +179,7 @@
                       <span class="nombre">{{ pagina.mesa2.pareja2?.jugador1?.nombre }} {{ pagina.mesa2.pareja2?.jugador1?.apellidos }}</span>
                       <div class="puntos-container">
                         <span class="puntos">PG {{ pagina.mesa2.pareja2?.jugador1?.PG || 0 }}</span>
-                        <span class="puntos">PC {{ pagina.mesa2.pareja2?.jugador1?.PC || 0 }}</span>
+                        <span class="puntos">Dif. {{ pagina.mesa2.pareja2?.jugador1?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>
@@ -188,7 +188,7 @@
                       <span class="nombre">{{ pagina.mesa2.pareja2?.jugador2?.nombre }} {{ pagina.mesa2.pareja2?.jugador2?.apellidos }}</span>
                       <div class="puntos-container">
                         <span class="puntos">PG {{ pagina.mesa2.pareja2?.jugador2?.PG || 0 }}</span>
-                        <span class="puntos">PC {{ pagina.mesa2.pareja2?.jugador2?.PC || 0 }}</span>
+                        <span class="puntos">Dif. {{ pagina.mesa2.pareja2?.jugador2?.PC || 0 }}</span>
                       </div>
                     </div>
                   </div>

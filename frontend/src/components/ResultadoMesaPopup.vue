@@ -9,7 +9,7 @@
             <div class="jugador">
               {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
             </div>
-            <div class="jugador-separator">y</div>
+            <div class="jugador-separator">/</div>
             <div class="jugador">
               {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
             </div>
@@ -50,22 +50,22 @@
               >
             </div>
             <div class="input-group">
-              <label for="pc-pareja1">PC:</label>
-              <input 
-                id="pc-pareja1"
-                name="pc-pareja1"
-                type="number" 
-                :value="puntosPareja1.PC" 
-                disabled
-              >
-            </div>
-            <div class="input-group">
               <label for="pg-pareja1">PG:</label>
               <input 
                 id="pg-pareja1"
                 name="pg-pareja1"
                 type="number" 
                 :value="puntosPareja1.PG" 
+                disabled
+              >
+            </div>
+            <div class="input-group">
+              <label for="pc-pareja1">Dif.:</label>
+              <input 
+                id="pc-pareja1"
+                name="pc-pareja1"
+                type="number" 
+                :value="puntosPareja1.PC" 
                 disabled
               >
             </div>
@@ -79,7 +79,7 @@
             <div class="jugador">
               {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
             </div>
-            <div class="jugador-separator">y</div>
+            <div class="jugador-separator">/</div>
             <div class="jugador">
               {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
             </div>
@@ -120,22 +120,22 @@
               >
             </div>
             <div class="input-group">
-              <label for="pc-pareja2">PC:</label>
-              <input 
-                id="pc-pareja2"
-                name="pc-pareja2"
-                type="number" 
-                :value="puntosPareja2.PC" 
-                disabled
-              >
-            </div>
-            <div class="input-group">
               <label for="pg-pareja2">PG:</label>
               <input 
                 id="pg-pareja2"
                 name="pg-pareja2"
                 type="number" 
                 :value="puntosPareja2.PG" 
+                disabled
+              >
+            </div>
+            <div class="input-group">
+              <label for="pc-pareja2">Dif.:</label>
+              <input 
+                id="pc-pareja2"
+                name="pc-pareja2"
+                type="number" 
+                :value="puntosPareja2.PC" 
                 disabled
               >
             </div>
