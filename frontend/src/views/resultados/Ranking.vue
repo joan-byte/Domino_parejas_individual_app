@@ -76,16 +76,6 @@ const jugadoresPaginados = computed(() => {
   return rankingData.value.slice(inicio, fin)
 })
 
-const siguientePagina = async () => {
-  if (paginaActual.value < totalPaginas.value - 1) {
-    paginaActual.value++
-  } else {
-    paginaActual.value = 0 // Volver al inicio
-  }
-  // Actualizar datos al cambiar de página
-  await cargarRanking()
-}
-
 const iniciarPaginacionAutomatica = () => {
   // Limpiar intervalo existente si hay uno
   if (intervaloAutomatico) {
@@ -94,20 +84,26 @@ const iniciarPaginacionAutomatica = () => {
   
   // Crear nuevo intervalo
   intervaloAutomatico = setInterval(async () => {
-    await siguientePagina()
+    // Primero actualizar los datos del ranking
+    await cargarRanking()
+    // Luego cambiar de página si hay más de una
+    if (paginaActual.value < totalPaginas.value - 1) {
+      paginaActual.value++
+    } else {
+      paginaActual.value = 0 // Volver al inicio
+    }
   }, 10000) // 10 segundos
 }
 
 // Reiniciar el intervalo cuando cambie el número total de jugadores
-watch(() => rankingData.value.length, (newValue) => {
-  if (newValue > jugadoresPorPagina) {
-    iniciarPaginacionAutomatica()
-  }
+watch(() => rankingData.value.length, () => {
+  iniciarPaginacionAutomatica()
 })
 
 // Añadir un watcher para la página actual
-watch(() => paginaActual.value, async () => {
-  await cargarRanking()
+watch(() => paginaActual.value, () => {
+  // No es necesario cargar el ranking aquí ya que los datos ya están en memoria
+  // y se actualizan automáticamente cada 10 segundos
 })
 
 const checkCampeonatoSeleccionado = () => {
@@ -154,10 +150,8 @@ onMounted(async () => {
   // Cargar datos iniciales
   await cargarRanking()
   
-  // Iniciar la paginación automática solo si hay datos
-  if (rankingData.value.length > jugadoresPorPagina) {
-    iniciarPaginacionAutomatica()
-  }
+  // Iniciar la actualización automática
+  iniciarPaginacionAutomatica()
 })
 
 onUnmounted(() => {
