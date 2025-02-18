@@ -66,6 +66,7 @@
                     <div class="jugador-info">
                       <span class="nombre">{{ pagina.mesa1.pareja1?.jugador1?.nombre }} {{ pagina.mesa1.pareja1?.jugador1?.apellidos }}</span>
                       <div class="puntos-container">
+                        <span class="puntos">Pos {{ pagina.mesa1.pareja1?.jugador1?.posicion || '-' }}</span>
                         <span class="puntos">PG {{ pagina.mesa1.pareja1?.jugador1?.PG || 0 }}</span>
                         <span class="puntos">Dif. {{ pagina.mesa1.pareja1?.jugador1?.PC || 0 }}</span>
                       </div>
@@ -75,6 +76,7 @@
                     <div class="jugador-info">
                       <span class="nombre">{{ pagina.mesa1.pareja1?.jugador2?.nombre }} {{ pagina.mesa1.pareja1?.jugador2?.apellidos }}</span>
                       <div class="puntos-container">
+                        <span class="puntos">Pos {{ pagina.mesa1.pareja1?.jugador2?.posicion || '-' }}</span>
                         <span class="puntos">PG {{ pagina.mesa1.pareja1?.jugador2?.PG || 0 }}</span>
                         <span class="puntos">Dif. {{ pagina.mesa1.pareja1?.jugador2?.PC || 0 }}</span>
                       </div>
@@ -86,6 +88,7 @@
                     <div class="jugador-info">
                       <span class="nombre">{{ pagina.mesa1.pareja2?.jugador1?.nombre }} {{ pagina.mesa1.pareja2?.jugador1?.apellidos }}</span>
                       <div class="puntos-container">
+                        <span class="puntos">Pos {{ pagina.mesa1.pareja2?.jugador1?.posicion || '-' }}</span>
                         <span class="puntos">PG {{ pagina.mesa1.pareja2?.jugador1?.PG || 0 }}</span>
                         <span class="puntos">Dif. {{ pagina.mesa1.pareja2?.jugador1?.PC || 0 }}</span>
                       </div>
@@ -95,6 +98,7 @@
                     <div class="jugador-info">
                       <span class="nombre">{{ pagina.mesa1.pareja2?.jugador2?.nombre }} {{ pagina.mesa1.pareja2?.jugador2?.apellidos }}</span>
                       <div class="puntos-container">
+                        <span class="puntos">Pos {{ pagina.mesa1.pareja2?.jugador2?.posicion || '-' }}</span>
                         <span class="puntos">PG {{ pagina.mesa1.pareja2?.jugador2?.PG || 0 }}</span>
                         <span class="puntos">Dif. {{ pagina.mesa1.pareja2?.jugador2?.PC || 0 }}</span>
                       </div>
@@ -158,6 +162,7 @@
                     <div class="jugador-info">
                       <span class="nombre">{{ pagina.mesa2.pareja1?.jugador1?.nombre }} {{ pagina.mesa2.pareja1?.jugador1?.apellidos }}</span>
                       <div class="puntos-container">
+                        <span class="puntos">Pos {{ pagina.mesa2.pareja1?.jugador1?.posicion || '-' }}</span>
                         <span class="puntos">PG {{ pagina.mesa2.pareja1?.jugador1?.PG || 0 }}</span>
                         <span class="puntos">Dif. {{ pagina.mesa2.pareja1?.jugador1?.PC || 0 }}</span>
                       </div>
@@ -167,6 +172,7 @@
                     <div class="jugador-info">
                       <span class="nombre">{{ pagina.mesa2.pareja1?.jugador2?.nombre }} {{ pagina.mesa2.pareja1?.jugador2?.apellidos }}</span>
                       <div class="puntos-container">
+                        <span class="puntos">Pos {{ pagina.mesa2.pareja1?.jugador2?.posicion || '-' }}</span>
                         <span class="puntos">PG {{ pagina.mesa2.pareja1?.jugador2?.PG || 0 }}</span>
                         <span class="puntos">Dif. {{ pagina.mesa2.pareja1?.jugador2?.PC || 0 }}</span>
                       </div>
@@ -178,6 +184,7 @@
                     <div class="jugador-info">
                       <span class="nombre">{{ pagina.mesa2.pareja2?.jugador1?.nombre }} {{ pagina.mesa2.pareja2?.jugador1?.apellidos }}</span>
                       <div class="puntos-container">
+                        <span class="puntos">Pos {{ pagina.mesa2.pareja2?.jugador1?.posicion || '-' }}</span>
                         <span class="puntos">PG {{ pagina.mesa2.pareja2?.jugador1?.PG || 0 }}</span>
                         <span class="puntos">Dif. {{ pagina.mesa2.pareja2?.jugador1?.PC || 0 }}</span>
                       </div>
@@ -187,6 +194,7 @@
                     <div class="jugador-info">
                       <span class="nombre">{{ pagina.mesa2.pareja2?.jugador2?.nombre }} {{ pagina.mesa2.pareja2?.jugador2?.apellidos }}</span>
                       <div class="puntos-container">
+                        <span class="puntos">Pos {{ pagina.mesa2.pareja2?.jugador2?.posicion || '-' }}</span>
                         <span class="puntos">PG {{ pagina.mesa2.pareja2?.jugador2?.PG || 0 }}</span>
                         <span class="puntos">Dif. {{ pagina.mesa2.pareja2?.jugador2?.PC || 0 }}</span>
                       </div>
@@ -542,8 +550,8 @@ const imprimirMesas = async () => {
     }
     const rankingData = await rankingResponse.json()
     
-    // Actualizar los datos de PG y PC de cada jugador
-    const rankingMap = new Map(rankingData.map(r => [r.jugador_id, r]))
+    // Crear un mapa para acceso rápido a los datos del ranking, incluyendo la posición
+    const rankingMap = new Map(rankingData.map((r, index) => [r.jugador_id, { ...r, posicion: index + 1 }]))
     
     // Actualizar los datos en las mesas
     mesasAplanadas.value.forEach(mesa => {
@@ -551,21 +559,25 @@ const imprimirMesas = async () => {
         const ranking = rankingMap.get(mesa.pareja1.jugador1_id)
         mesa.pareja1.jugador1.PG = ranking?.PG || 0
         mesa.pareja1.jugador1.PC = ranking?.PC || 0
+        mesa.pareja1.jugador1.posicion = ranking?.posicion || '-'
       }
       if (mesa.pareja1?.jugador2) {
         const ranking = rankingMap.get(mesa.pareja1.jugador2_id)
         mesa.pareja1.jugador2.PG = ranking?.PG || 0
         mesa.pareja1.jugador2.PC = ranking?.PC || 0
+        mesa.pareja1.jugador2.posicion = ranking?.posicion || '-'
       }
       if (mesa.pareja2?.jugador1) {
         const ranking = rankingMap.get(mesa.pareja2.jugador1_id)
         mesa.pareja2.jugador1.PG = ranking?.PG || 0
         mesa.pareja2.jugador1.PC = ranking?.PC || 0
+        mesa.pareja2.jugador1.posicion = ranking?.posicion || '-'
       }
       if (mesa.pareja2?.jugador2) {
         const ranking = rankingMap.get(mesa.pareja2.jugador2_id)
         mesa.pareja2.jugador2.PG = ranking?.PG || 0
         mesa.pareja2.jugador2.PC = ranking?.PC || 0
+        mesa.pareja2.jugador2.posicion = ranking?.posicion || '-'
       }
     })
     
@@ -853,17 +865,17 @@ const imprimirMesas = async () => {
 
   .puntos-container {
     display: flex;
-    gap: 15px;
+    gap: 10px;
     margin-left: auto;
     font-size: 12px;
     justify-content: flex-end;
-    width: 140px;
+    width: 180px;
   }
 
   .puntos {
     font-weight: bold;
     color: #333;
-    min-width: 50px;
+    min-width: 45px;
     text-align: right;
   }
 
