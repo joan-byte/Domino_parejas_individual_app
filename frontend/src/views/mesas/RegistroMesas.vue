@@ -315,6 +315,11 @@ const cerrarPartida = async () => {
       }
 
       alert('Campeonato finalizado correctamente')
+      // Cerrar la ventana secundaria y limpiar referencia solo al finalizar el campeonato
+      if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
+        ventanaSecundaria.value.close()
+        localStorage.removeItem('ventanaSecundaria')
+      }
       router.push('/')
       return
     }
@@ -335,7 +340,7 @@ const cerrarPartida = async () => {
         },
         body: JSON.stringify({ 
           ranking,
-          partida: nuevaPartida // Asegurarnos de usar la nueva partida
+          partida: nuevaPartida
         })
       })
 
@@ -357,7 +362,14 @@ const cerrarPartida = async () => {
     }
 
     alert('Partida cerrada y nuevas parejas asignadas correctamente')
-    // 5. Redirigir a la página de asignación de mesas para la siguiente partida
+    
+    // 5. Actualizar la ventana secundaria a la vista de asignación de mesas
+    if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
+      ventanaSecundaria.value.location.href = `/mesas/asignacion/${campeonatoId}`
+      vistaSecundaria.value = 'mesas' // Actualizar el estado del botón
+    }
+    
+    // 6. Redirigir la ventana principal a la página de asignación de mesas
     router.push(`/mesas/asignacion/${campeonatoId}`)
   } catch (error) {
     console.error('Error:', error)
@@ -381,16 +393,35 @@ const cambiarVista = (vista) => {
 
 // Función para abrir la ventana secundaria
 const abrirVentanaSecundaria = (vista) => {
+  // Verificar si ya existe una ventana secundaria guardada
+  const ventanaGuardada = localStorage.getItem('ventanaSecundaria')
+  if (ventanaGuardada) {
+    const ventanaExistente = window.open('', 'VisualizacionSecundaria')
+    if (ventanaExistente && !ventanaExistente.closed) {
+      ventanaSecundaria.value = ventanaExistente
+      const ruta = vista === 'ranking' 
+        ? `/resultados/ranking/${campeonatoId}`
+        : `/mesas/asignacion/${campeonatoId}`
+      ventanaSecundaria.value.location.href = ruta
+      return
+    }
+  }
+
   const ruta = vista === 'ranking' 
     ? `/resultados/ranking/${campeonatoId}`
     : `/mesas/asignacion/${campeonatoId}`
     
-  // Abrir la ventana en el monitor secundario si no existe
+  // Abrir nueva ventana si no existe
   ventanaSecundaria.value = window.open(
     ruta,
     'VisualizacionSecundaria',
     'width=1024,height=768,menubar=no,toolbar=no,location=no,status=no'
   )
+  
+  // Guardar referencia en localStorage
+  if (ventanaSecundaria.value) {
+    localStorage.setItem('ventanaSecundaria', 'true')
+  }
 }
 
 // Abrir ventana de ranking al montar el componente
@@ -402,18 +433,21 @@ onMounted(async () => {
     partidaActual.value = campeonato.partida_actual || 1
     esUltimaPartida.value = partidaActual.value === campeonato.numero_partidas
     await cargarMesas()
-    // Abrir ventana de ranking por defecto
-    abrirVentanaSecundaria('ranking')
+    
+    // Verificar si ya existe una ventana secundaria
+    const ventanaGuardada = localStorage.getItem('ventanaSecundaria')
+    if (!ventanaGuardada) {
+      // Solo abrir nueva ventana si no existe
+      abrirVentanaSecundaria('ranking')
+    }
   } else {
     console.error('No hay campeonato seleccionado')
   }
 })
 
-// Cerrar la ventana secundaria al desmontar el componente
+// Eliminar el cierre de la ventana en onUnmounted
 onUnmounted(() => {
-  if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
-    ventanaSecundaria.value.close()
-  }
+  // No cerramos la ventana secundaria al desmontar
 })
 
 const textoCerrarPartida = computed(() => {
