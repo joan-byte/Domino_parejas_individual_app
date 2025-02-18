@@ -13,7 +13,7 @@ class Resultado(Base):
     jugador_id = Column(Integer, ForeignKey("jugadores.id"))
     pareja = Column(Integer)  # 1 o 2 (número de la pareja en la mesa)
     PT = Column(Integer)  # Puntos Totales
-    PV = Column(Integer)  # Puntos Válidos (≤300)
+    PV = Column(Integer)  # Puntos Válidos (limitado por PM del campeonato)
     PC = Column(Integer)  # Puntos Conseguidos (PV propio - PV contrario)
     PG = Column(Integer)  # Partida Ganada (1 si PC > 0, 0 si PC < 0)
     MG = Column(Integer)  # Manos Ganadas (se introduce junto con PT)

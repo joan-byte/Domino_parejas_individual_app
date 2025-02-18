@@ -23,7 +23,7 @@
                 type="number" 
                 v-model="puntosPareja1.PT" 
                 min="0" 
-                max="600"
+                :max="campeonatoPM * 2"
                 @input="calcularPuntos(1)"
               >
             </div>
@@ -93,7 +93,7 @@
                 type="number" 
                 v-model="puntosPareja2.PT" 
                 min="0" 
-                max="600"
+                :max="campeonatoPM * 2"
                 @input="calcularPuntos(2)"
               >
             </div>
@@ -180,6 +180,7 @@ const emit = defineEmits(['close', 'resultadoRegistrado'])
 
 const puntosPareja1 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
 const puntosPareja2 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
+const campeonatoPM = ref(300) // Valor por defecto
 
 const pvIguales = computed(() => {
   return puntosPareja1.value.PV === puntosPareja2.value.PV && 
@@ -188,6 +189,22 @@ const pvIguales = computed(() => {
 
 // Crear el bus de eventos para actualizar el ranking
 const rankingBus = useEventBus('update-ranking')
+
+// Obtener el PM del campeonato al montar el componente
+const obtenerPM = async () => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/campeonatos/${props.campeonatoId}`)
+    if (response.ok) {
+      const campeonato = await response.json()
+      campeonatoPM.value = campeonato.PM
+    }
+  } catch (error) {
+    console.error('Error al obtener PM del campeonato:', error)
+  }
+}
+
+// Llamar a obtenerPM cuando el componente se monta y cuando cambia el campeonatoId
+watch(() => props.campeonatoId, obtenerPM, { immediate: true })
 
 watch(() => props.resultadoExistente, (newVal) => {
   if (newVal) {
@@ -202,12 +219,12 @@ const calcularPuntos = (parejaNum) => {
   const pareja = parejaNum === 1 ? puntosPareja1.value : puntosPareja2.value
   const parejaContraria = parejaNum === 1 ? puntosPareja2.value : puntosPareja1.value
   
-  // Validar PT
+  // Validar PT (máximo el doble del PM)
   if (pareja.PT < 0) pareja.PT = 0
-  if (pareja.PT > 600) pareja.PT = 600
+  if (pareja.PT > campeonatoPM.value * 2) pareja.PT = campeonatoPM.value * 2
   
-  // Calcular PV (máximo 300)
-  pareja.PV = Math.min(pareja.PT, 300)
+  // Calcular PV usando el PM del campeonato
+  pareja.PV = Math.min(pareja.PT, campeonatoPM.value)
   
   // Calcular PC (diferencia entre PV)
   pareja.PC = pareja.PV - parejaContraria.PV
@@ -219,9 +236,9 @@ const calcularPuntos = (parejaNum) => {
 }
 
 const validarPuntos = () => {
-  // Validar que los puntos totales estén dentro del rango
-  if (puntosPareja1.value.PT < 0 || puntosPareja1.value.PT > 600 ||
-      puntosPareja2.value.PT < 0 || puntosPareja2.value.PT > 600) {
+  // Validar que los puntos totales estén dentro del rango (0 a 2*PM)
+  if (puntosPareja1.value.PT < 0 || puntosPareja1.value.PT > campeonatoPM.value * 2 ||
+      puntosPareja2.value.PT < 0 || puntosPareja2.value.PT > campeonatoPM.value * 2) {
     return false
   }
 

@@ -227,8 +227,13 @@ async def get_ranking_campeonato(campeonato_id: int, db: Session = Depends(get_d
             "ultima_partida": int(resultados_jugador.ultima_partida) if resultados_jugador else 0
         })
 
-    # Ordenamos el ranking por PG, PC, PT y MG (ascendente)
-    ranking_list.sort(key=lambda x: (-x["PG"], -x["PC"], -x["PT"], x["MG"]))
+    # Ordenamos el ranking por PG, PC, PT y MG (descendente)
+    ranking_list.sort(key=lambda x: (
+        -x["PG"],      # Primero por PG (descendente)
+        -x["PC"],      # Segundo por PC (descendente)
+        -x["PT"],      # Tercero por PT (descendente)
+        -x["MG"]       # Cuarto por MG (descendente)
+    ))
     
     return ranking_list
 

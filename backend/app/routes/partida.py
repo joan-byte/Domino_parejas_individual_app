@@ -43,7 +43,8 @@ async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends
         Resultado.jugador_id,
         func.sum(Resultado.PG).label('total_PG'),
         func.sum(Resultado.PC).label('total_PC'),
-        func.sum(Resultado.PT).label('total_PT')
+        func.sum(Resultado.PT).label('total_PT'),
+        func.sum(Resultado.MG).label('total_MG')
     ).filter(
         Resultado.campeonato_id == campeonato_id,
         Resultado.partida <= partida
@@ -52,7 +53,8 @@ async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends
     ).order_by(
         func.sum(Resultado.PG).desc(),
         func.sum(Resultado.PC).desc(),
-        func.sum(Resultado.PT).desc()
+        func.sum(Resultado.PT).desc(),
+        func.sum(Resultado.MG).desc()
     ).all()
     
     if not ranking:
@@ -70,22 +72,22 @@ async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends
             
         mesa = (i // 4) + 1
         
-        # Pareja 1: jugador ranking 1 y 3
+        # Pareja 1: jugador ranking impar (1,3)
         pareja1 = ParejaPartida(
             partida=nueva_partida,
             mesa=mesa,
-            jugador1_id=jugadores_ordenados[i],      # Ranking 1
-            jugador2_id=jugadores_ordenados[i + 2],  # Ranking 3
+            jugador1_id=jugadores_ordenados[i],      # Posición 4n+1 (1,5,9,...)
+            jugador2_id=jugadores_ordenados[i + 2],  # Posición 4n+3 (3,7,11,...)
             numero_pareja=1,
             campeonato_id=campeonato_id
         )
         
-        # Pareja 2: jugador ranking 2 y 4
+        # Pareja 2: jugador ranking par (2,4)
         pareja2 = ParejaPartida(
             partida=nueva_partida,
             mesa=mesa,
-            jugador1_id=jugadores_ordenados[i + 1],  # Ranking 2
-            jugador2_id=jugadores_ordenados[i + 3],  # Ranking 4
+            jugador1_id=jugadores_ordenados[i + 1],  # Posición 4n+2 (2,6,10,...)
+            jugador2_id=jugadores_ordenados[i + 3],  # Posición 4n+4 (4,8,12,...)
             numero_pareja=2,
             campeonato_id=campeonato_id
         )

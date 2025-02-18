@@ -110,7 +110,8 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
         Resultado.jugador_id,
         func.sum(Resultado.PG).label('total_PG'),
         func.sum(Resultado.PC).label('total_PC'),
-        func.sum(Resultado.PT).label('total_PT')
+        func.sum(Resultado.PT).label('total_PT'),
+        func.sum(Resultado.MG).label('total_MG')  # Añadir MG al ranking
     ).filter(
         Resultado.campeonato_id == campeonato_id,
         Resultado.partida <= partida_actual
@@ -119,7 +120,8 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
     ).order_by(
         func.sum(Resultado.PG).desc(),
         func.sum(Resultado.PC).desc(),
-        func.sum(Resultado.PT).desc()
+        func.sum(Resultado.PT).desc(),
+        func.sum(Resultado.MG).desc()  # Ordenar también por MG
     ).all()
     
     if not ranking:
@@ -136,22 +138,22 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
     for mesa in range(1, num_mesas + 1):
         idx_base = (mesa - 1) * 4
         
-        # Pareja 1: jugador ranking 4n+1 con jugador ranking 4n+3
+        # Pareja 1: jugador ranking impar (1,3)
         pareja1 = ParejaPartida(
             partida=siguiente_partida,
             mesa=mesa,
-            jugador1_id=jugadores_ordenados[idx_base],      # Posición 4n+1
-            jugador2_id=jugadores_ordenados[idx_base + 2],  # Posición 4n+3
+            jugador1_id=jugadores_ordenados[idx_base],      # Posición 4n+1 (1,5,9,...)
+            jugador2_id=jugadores_ordenados[idx_base + 2],  # Posición 4n+3 (3,7,11,...)
             numero_pareja=1,
             campeonato_id=campeonato_id
         )
         
-        # Pareja 2: jugador ranking 4n+2 con jugador ranking 4n+4
+        # Pareja 2: jugador ranking par (2,4)
         pareja2 = ParejaPartida(
             partida=siguiente_partida,
             mesa=mesa,
-            jugador1_id=jugadores_ordenados[idx_base + 1],  # Posición 4n+2
-            jugador2_id=jugadores_ordenados[idx_base + 3],  # Posición 4n+4
+            jugador1_id=jugadores_ordenados[idx_base + 1],  # Posición 4n+2 (2,6,10,...)
+            jugador2_id=jugadores_ordenados[idx_base + 3],  # Posición 4n+4 (4,8,12,...)
             numero_pareja=2,
             campeonato_id=campeonato_id
         )
