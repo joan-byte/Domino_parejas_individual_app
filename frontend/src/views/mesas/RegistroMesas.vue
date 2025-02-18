@@ -1,7 +1,25 @@
 <template>
   <div class="registro-mesas">
     <div class="header">
-      <h2>Registro de Mesas</h2>
+      <div class="header-left">
+        <h2>Registro de Mesas</h2>
+        <div class="visualizacion-control">
+          <button
+            class="btn-visualizacion"
+            :class="{ active: vistaSecundaria === 'ranking' }"
+            @click="cambiarVista('ranking')"
+          >
+            Ranking
+          </button>
+          <button
+            class="btn-visualizacion"
+            :class="{ active: vistaSecundaria === 'mesas' }"
+            @click="cambiarVista('mesas')"
+          >
+            Mesas
+          </button>
+        </div>
+      </div>
       <div class="header-right">
         <div class="partida-info">Partida {{ partidaActual }}</div>
         <button
@@ -111,6 +129,10 @@ const resultadoExistente = ref(null)
 
 // Crear el bus de eventos para actualizar el ranking
 const rankingBus = useEventBus('update-ranking')
+
+// Añadir nuevas variables para el control de visualización
+const vistaSecundaria = ref('ranking')
+const ventanaSecundaria = ref(null)
 
 const abrirRegistro = (mesa) => {
   mesaSeleccionada.value = mesa
@@ -343,6 +365,35 @@ const cerrarPartida = async () => {
   }
 }
 
+// Función para cambiar la vista en la ventana secundaria
+const cambiarVista = (vista) => {
+  vistaSecundaria.value = vista
+  if (!ventanaSecundaria.value || ventanaSecundaria.value.closed) {
+    abrirVentanaSecundaria(vista)
+  } else {
+    // Actualizar la URL de la ventana existente
+    const ruta = vista === 'ranking' 
+      ? `/resultados/ranking/${campeonatoId}`
+      : `/mesas/asignacion/${campeonatoId}`
+    ventanaSecundaria.value.location.href = ruta
+  }
+}
+
+// Función para abrir la ventana secundaria
+const abrirVentanaSecundaria = (vista) => {
+  const ruta = vista === 'ranking' 
+    ? `/resultados/ranking/${campeonatoId}`
+    : `/mesas/asignacion/${campeonatoId}`
+    
+  // Abrir la ventana en el monitor secundario si no existe
+  ventanaSecundaria.value = window.open(
+    ruta,
+    'VisualizacionSecundaria',
+    'width=1024,height=768,menubar=no,toolbar=no,location=no,status=no'
+  )
+}
+
+// Abrir ventana de ranking al montar el componente
 onMounted(async () => {
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
   if (campeonatoGuardado) {
@@ -351,15 +402,17 @@ onMounted(async () => {
     partidaActual.value = campeonato.partida_actual || 1
     esUltimaPartida.value = partidaActual.value === campeonato.numero_partidas
     await cargarMesas()
+    // Abrir ventana de ranking por defecto
+    abrirVentanaSecundaria('ranking')
   } else {
     console.error('No hay campeonato seleccionado')
   }
 })
 
-// Limpiar el event bus cuando el componente se desmonta
+// Cerrar la ventana secundaria al desmontar el componente
 onUnmounted(() => {
-  if (rankingBus) {
-    rankingBus.off()
+  if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
+    ventanaSecundaria.value.close()
   }
 })
 
@@ -387,6 +440,36 @@ const textoCerrarPartida = computed(() => {
 
 .header h2 {
   margin: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.visualizacion-control {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-visualizacion {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: #87CEEB; /* Azul cielo */
+  color: white;
+}
+
+.btn-visualizacion:hover {
+  opacity: 0.9;
+}
+
+.btn-visualizacion.active {
+  background-color: #00008B; /* Azul oscuro */
 }
 
 .header-right {

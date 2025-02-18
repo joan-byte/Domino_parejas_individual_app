@@ -45,3 +45,7 @@ Domino_App/
 
 # Scripts de utilidad
 backend/scripts/
+
+# Archivos de backup e importación
+backend/jugadores_backup.json
+backend/importar_jugadores.py
