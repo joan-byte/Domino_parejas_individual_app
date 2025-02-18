@@ -30,6 +30,9 @@
             required 
             class="form-control"
             autocomplete="off"
+            pattern="[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]+"
+            title="Solo letras (incluyendo acentos), espacios y caracteres especiales permitidos"
+            @input="validarCampo($event, 'nombre')"
           >
         </div>
 
@@ -42,6 +45,9 @@
             required 
             class="form-control"
             autocomplete="off"
+            pattern="[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]+"
+            title="Solo letras (incluyendo acentos), espacios y caracteres especiales permitidos"
+            @input="validarCampo($event, 'apellidos')"
           >
         </div>
 
@@ -53,6 +59,9 @@
             v-model="jugador.club" 
             class="form-control"
             autocomplete="off"
+            pattern="[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]+"
+            title="Solo letras (incluyendo acentos), espacios y caracteres especiales permitidos"
+            @input="validarCampo($event, 'club')"
           >
         </div>
 
@@ -65,7 +74,7 @@
           >
             Cancelar
           </button>
-          <button type="submit" class="btn-submit">
+          <button type="submit" class="btn-submit" :disabled="!formularioValido">
             {{ jugadorSeleccionado ? 'Guardar Cambios' : 'Inscribir Jugador' }}
           </button>
           <button 
@@ -129,7 +138,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
@@ -351,6 +360,23 @@ const volverAtras = async () => {
     alert('Error al eliminar las asignaciones')
   }
 }
+
+const validarCampo = (event, campo) => {
+  const patron = /^[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]*$/
+  const valor = event.target.value
+  
+  if (!patron.test(valor)) {
+    // Si el valor no coincide con el patrón, eliminar el último carácter
+    jugador[campo] = valor.slice(0, -1)
+  }
+}
+
+const formularioValido = computed(() => {
+  const patron = /^[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]+$/
+  return patron.test(jugador.nombre) && 
+         patron.test(jugador.apellidos) &&
+         (!jugador.club || patron.test(jugador.club))
+})
 
 onMounted(async () => {
   await verificarSorteoYResultados()
