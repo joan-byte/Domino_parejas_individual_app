@@ -28,6 +28,7 @@
             <div class="dropdown-menu" aria-labelledby="navbarDropdownMesas">
               <router-link :to="`/mesas/asignacion/${campeonatoSeleccionado.id}`" class="dropdown-item">Asignación</router-link>
               <router-link :to="`/mesas/registro/${campeonatoSeleccionado.id}`" class="dropdown-item">Registro</router-link>
+              <router-link :to="`/mesas/imprimir/${campeonatoSeleccionado.id}`" class="dropdown-item">Imprimir</router-link>
             </div>
           </div>
         </div>

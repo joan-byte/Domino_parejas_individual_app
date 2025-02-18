@@ -5,6 +5,7 @@ import ModificarCampeonato from '../views/ModificarCampeonato.vue'
 import Inscripcion from '../views/Inscripcion.vue'
 import AsignacionMesas from '../views/mesas/AsignacionMesas.vue'
 import RegistroMesas from '../views/mesas/RegistroMesas.vue'
+import ImprimirMesas from '../views/mesas/ImprimirMesas.vue'
 import Ranking from '../views/resultados/Ranking.vue'
 import Podium from '../views/resultados/Podium.vue'
 
@@ -38,6 +39,11 @@ const routes = [
     path: '/mesas/registro/:campeonatoId',
     name: 'registro-mesas',
     component: RegistroMesas
+  },
+  {
+    path: '/mesas/imprimir/:campeonatoId',
+    name: 'imprimir-mesas',
+    component: ImprimirMesas
   },
   {
     path: '/resultados/ranking/:campeonatoId',
