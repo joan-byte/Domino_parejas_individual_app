@@ -127,8 +127,24 @@ const loadRanking = async () => {
     if (campeonatoActivo) {
       tournamentName.value = campeonatoActivo.nombre
       
-      // Obtener el ranking
-      const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoActivo.id}`)
+      // Obtener la última partida con resultados
+      const ultimaPartidaResponse = await fetch(`http://localhost:8000/api/parejas-partida/ultima-partida/${campeonatoActivo.id}`)
+      if (!ultimaPartidaResponse.ok) {
+        throw new Error('Error al obtener la última partida')
+      }
+      const { ultima_partida } = await ultimaPartidaResponse.json()
+      
+      // Si no hay partidas o la partida actual es 0, no mostrar ranking
+      if (!ultima_partida) {
+        ranking.value = []
+        firstPlace.value = null
+        secondPlace.value = null
+        thirdPlace.value = null
+        return
+      }
+      
+      // Obtener el ranking usando la última partida con resultados
+      const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoActivo.id}?partida=${ultima_partida}`)
       if (!rankingResponse.ok) {
         throw new Error(`Error al obtener ranking: ${rankingResponse.status}`)
       }

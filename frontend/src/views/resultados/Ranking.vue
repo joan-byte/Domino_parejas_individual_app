@@ -3,7 +3,7 @@
     <div class="header">
       <h2>Ranking</h2>
       <div class="partida-info">
-        <span>Partida: {{ partidaActual }}</span>
+        <span>Partida Actual: {{ partidaActual }}</span>
       </div>
     </div>
     
@@ -45,7 +45,10 @@
     </div>
     
     <div v-else class="no-data">
-      No hay datos de ranking disponibles.
+      <p>No hay datos de ranking disponibles.</p>
+      <p v-if="partidaActual > 1" class="hint">
+        Los resultados se mostrarán cuando se registren las puntuaciones de la partida actual.
+      </p>
     </div>
   </div>
 </template>
@@ -53,10 +56,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useEventBus } from '@vueuse/core'
+import { useRoute } from 'vue-router'
 
+const route = useRoute()
 const parejas = ref([])
 const resultados = ref([])
 const partidaActual = ref(1)
+const partidaMostrada = ref(1)
 const campeonatoSeleccionado = ref(null)
 const rankingData = ref([])
 const paginaActual = ref(0)
@@ -65,6 +71,12 @@ let intervaloAutomatico = null
 
 // Crear el bus de eventos para actualizar el ranking
 const rankingBus = useEventBus('update-ranking')
+
+// Obtener la partida de los query params
+const getPartidaFromUrl = () => {
+  const partidaParam = route.query.partida
+  return partidaParam ? parseInt(partidaParam) : 1
+}
 
 const totalPaginas = computed(() => {
   return Math.ceil(rankingData.value.length / jugadoresPorPagina)
@@ -106,11 +118,16 @@ watch(() => paginaActual.value, () => {
   // y se actualizan automáticamente cada 10 segundos
 })
 
+// Añadir un watcher para los query params
+watch(() => route.query.partida, (newPartida) => {
+  partidaActual.value = parseInt(newPartida) || 1
+  cargarRanking()
+})
+
 const checkCampeonatoSeleccionado = () => {
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
   if (campeonatoGuardado) {
     campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
-    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 1
   }
 }
 
@@ -118,20 +135,38 @@ const cargarRanking = async () => {
   try {
     const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
     if (!campeonatoGuardado) {
+      console.log('No hay campeonato seleccionado')
       rankingData.value = []
       return
     }
 
     const campeonato = JSON.parse(campeonatoGuardado)
-    partidaActual.value = campeonato.partida_actual || 1
+    console.log('Cargando ranking para campeonato:', campeonato.id, 'partida:', partidaActual.value)
     
     // Obtener el ranking
-    const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonato.id}`)
+    const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonato.id}?partida=${partidaActual.value}`)
     if (!rankingResponse.ok) {
       throw new Error(`Error al obtener ranking: ${rankingResponse.status}`)
     }
     const data = await rankingResponse.json()
+    console.log('Datos del ranking recibidos:', data)
+    
+    if (!data || data.length === 0) {
+      console.log('No hay datos de ranking disponibles')
+      rankingData.value = []
+      return
+    }
+    
     rankingData.value = data
+    
+    // Actualizar la partida mostrada con la última partida que tiene resultados
+    if (data.length > 0) {
+      // Encontrar la última partida con resultados
+      const ultimaPartidaConResultados = Math.max(...data.map(jugador => jugador.ultima_partida || 0))
+      partidaMostrada.value = ultimaPartidaConResultados
+      console.log('Última partida con resultados:', ultimaPartidaConResultados)
+      console.log('Partida actual:', partidaActual.value)
+    }
   } catch (error) {
     console.error('Error al cargar los datos del ranking:', error)
     rankingData.value = []
@@ -144,8 +179,28 @@ rankingBus.on(() => {
 })
 
 onMounted(async () => {
+  // Verificar si estamos en una ruta de ranking específica
+  const campeonatoId = route.params.campeonatoId
+  if (campeonatoId) {
+    try {
+      // Obtener información del campeonato
+      const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
+      if (response.ok) {
+        const campeonato = await response.json()
+        // Guardar en localStorage
+        localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+        campeonatoSeleccionado.value = campeonato
+      }
+    } catch (error) {
+      console.error('Error al cargar el campeonato:', error)
+    }
+  }
+
   checkCampeonatoSeleccionado()
   window.addEventListener('storage', checkCampeonatoSeleccionado)
+  
+  // Establecer la partida actual desde la URL
+  partidaActual.value = getPartidaFromUrl()
   
   // Cargar datos iniciales
   await cargarRanking()
@@ -153,6 +208,27 @@ onMounted(async () => {
   // Iniciar la actualización automática
   iniciarPaginacionAutomatica()
 })
+
+// Añadir un watcher para la ruta
+watch(
+  () => route.params.campeonatoId,
+  async (newId) => {
+    if (newId) {
+      try {
+        const response = await fetch(`http://localhost:8000/api/campeonatos/${newId}`)
+        if (response.ok) {
+          const campeonato = await response.json()
+          localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+          campeonatoSeleccionado.value = campeonato
+          await cargarRanking()
+        }
+      } catch (error) {
+        console.error('Error al cargar el campeonato:', error)
+      }
+    }
+  },
+  { immediate: true }
+)
 
 onUnmounted(() => {
   window.removeEventListener('storage', checkCampeonatoSeleccionado)
@@ -226,10 +302,23 @@ onUnmounted(() => {
   color: #666;
   margin: 20px 0;
   font-size: 1.1em;
+  padding: 2rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.hint {
+  font-size: 0.9em;
+  color: #4CAF50;
+  margin-top: 1rem;
+  font-style: italic;
 }
 
 .partida-pendiente {
+  font-size: 0.9em;
   color: #dc3545;
-  font-weight: bold;
+  margin-left: 10px;
+  font-style: italic;
 }
 </style> 

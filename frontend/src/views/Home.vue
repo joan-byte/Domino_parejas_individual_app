@@ -4,7 +4,7 @@
       <h1>Dominó por Parejas Individual</h1>
     </div>
     
-    <div class="campeonatos-list" v-if="campeonatos.length > 0">
+    <div class="campeonatos-list">
       <div class="campeonatos-grid">
         <div 
           v-for="campeonato in campeonatos" 
@@ -17,15 +17,19 @@
             <h2>{{ campeonato.nombre }}</h2>
             <div class="estado-campeonato">
               <span v-if="campeonato.finalizado" class="estado finalizado">Finalizado</span>
-              <span v-else-if="campeonato.partida_actual !== 'No hay registros'" class="estado activo">En curso</span>
+              <span v-else-if="campeonato.partida_actual > 0" class="estado activo">En curso</span>
+              <span v-else class="estado pendiente">Pendiente de inicio</span>
             </div>
           </div>
           <div class="card-content">
+            <p><strong>ID:</strong> {{ campeonato.id }}</p>
             <p><strong>Fecha de inicio:</strong> {{ formatDate(campeonato.fecha_inicio) }}</p>
             <p><strong>Duración:</strong> {{ campeonato.dias_duracion }} días</p>
             <p><strong>Partidas:</strong> {{ campeonato.numero_partidas }}</p>
             <p><strong>Puntos Máximos:</strong> {{ campeonato.PM }}</p>
             <p><strong>Partida actual:</strong> {{ campeonato.partida_actual }}</p>
+            <p><strong>Activo:</strong> {{ campeonato.activo ? 'Sí' : 'No' }}</p>
+            <p><strong>Finalizado:</strong> {{ campeonato.finalizado ? 'Sí' : 'No' }}</p>
           </div>
           <div class="button-group">
             <button 
@@ -45,8 +49,8 @@
       </div>
     </div>
 
-    <div class="no-campeonatos" v-else>
-      <p>No hay campeonatos activos en este momento.</p>
+    <div class="no-campeonatos" v-if="campeonatos.length === 0">
+      <p>No hay campeonatos registrados en este momento.</p>
     </div>
   </div>
 </template>
@@ -165,6 +169,7 @@ const cargarCampeonatos = async () => {
     const response = await axios.get('http://localhost:8000/api/campeonatos/')
     const campeonatosData = response.data
 
+    // Procesar cada campeonato
     for (const campeonato of campeonatosData) {
       try {
         const responsePartidas = await axios.get(`http://localhost:8000/api/parejas-partida/ultima-partida/${campeonato.id}`)
@@ -175,11 +180,12 @@ const cargarCampeonatos = async () => {
         }
       } catch (error) {
         console.error(`Error al obtener la última partida del campeonato ${campeonato.id}:`, error)
-        campeonato.partida_actual = "Error al obtener partida"
+        campeonato.partida_actual = 0
       }
     }
 
     campeonatos.value = campeonatosData
+
     // Verificar si hay un campeonato seleccionado después de cargar los datos
     const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
     if (campeonatoGuardado && route.path === '/') {
@@ -191,6 +197,9 @@ const cargarCampeonatos = async () => {
 }
 
 onMounted(async () => {
+  // Limpiar localStorage al iniciar
+  localStorage.clear()
+  
   if (route.path === '/') {
     const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
     if (campeonatoGuardado) {
@@ -347,6 +356,11 @@ h2 {
 .estado.activo {
   background-color: #28a745;
   color: white;
+}
+
+.estado.pendiente {
+  background-color: #ffc107;
+  color: black;
 }
 
 .btn-seleccionar:disabled {

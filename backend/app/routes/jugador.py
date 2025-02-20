@@ -114,7 +114,9 @@ def delete_jugador(jugador_id: int, db: Session = Depends(get_db)):
 @router.get("/campeonato/{campeonato_id}", response_model=List[JugadorResponse])
 async def get_jugadores_by_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
     """Obtener jugadores de un campeonato específico"""
-    jugadores = db.query(Jugador).filter(Jugador.campeonato_id == campeonato_id).all()
+    jugadores = db.query(Jugador).filter(
+        Jugador.campeonato_id == campeonato_id
+    ).order_by(Jugador.id).all()
     return jugadores
 
 @router.put("/{jugador_id}/toggle-activo", response_model=JugadorResponse)

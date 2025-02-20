@@ -121,7 +121,7 @@ const campeonatoId = parseInt(route.params.campeonatoId)
 const mesas = ref([])
 const mesasRegistradas = ref({})
 const campeonatoSeleccionado = ref(null)
-const partidaActual = ref(1)
+const partidaActual = ref(null)
 const mesaSeleccionada = ref(null)
 const showPopup = ref(false)
 const esUltimaPartida = ref(false)
@@ -273,17 +273,8 @@ const cerrarPartida = async () => {
   if (!todasMesasRegistradas.value) return
 
   try {
-    // Primero obtener el estado actual del campeonato
-    const responseCampeonato = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
-    if (!responseCampeonato.ok) {
-      throw new Error('Error al obtener información del campeonato')
-    }
-    const campeonato = await responseCampeonato.json()
-    
-    // Actualizar el estado local con la información más reciente
-    campeonatoSeleccionado.value = campeonato
-    partidaActual.value = campeonato.partida_actual
-    esUltimaPartida.value = partidaActual.value === campeonato.numero_partidas
+    // Recargar el estado actual del campeonato
+    await recargarEstadoCampeonato()
 
     // 1. Cerrar la partida actual
     const responseCierre = await fetch(`http://localhost:8000/api/parejas-partida/partidas/cerrar/${campeonatoId}/${partidaActual.value}`, {
@@ -315,11 +306,11 @@ const cerrarPartida = async () => {
       }
 
       alert('Campeonato finalizado correctamente')
-      // Cerrar la ventana secundaria y limpiar referencia solo al finalizar el campeonato
       if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
         ventanaSecundaria.value.close()
         localStorage.removeItem('ventanaSecundaria')
       }
+      localStorage.clear()
       router.push('/')
       return
     }
@@ -333,7 +324,7 @@ const cerrarPartida = async () => {
 
     // 3. Crear las nuevas parejas según el ranking para la siguiente partida
     try {
-      const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/parejas-partida/siguiente-partida/${campeonatoId}/${partidaActual.value}`, {
+      const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/siguiente-partida/${campeonatoId}/${nuevaPartida - 1}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -348,29 +339,25 @@ const cerrarPartida = async () => {
         const errorData = await responseNuevasParejas.json()
         throw new Error(errorData.detail || 'Error al asignar nuevas parejas')
       }
+
+      // Recargar el estado del campeonato después de crear las nuevas parejas
+      await recargarEstadoCampeonato()
+
+      alert('Partida cerrada y nuevas parejas asignadas correctamente')
+      
+      // Actualizar la ventana secundaria
+      if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
+        ventanaSecundaria.value.location.href = `/mesas/asignacion/${campeonatoId}`
+        vistaSecundaria.value = 'mesas'
+      }
+      
+      // Redirigir la ventana principal
+      router.push(`/mesas/asignacion/${campeonatoId}`)
+
     } catch (error) {
       console.error('Error al crear nuevas parejas:', error)
       throw new Error('Error al asignar nuevas parejas: ' + error.message)
     }
-
-    // 4. Actualizar el localStorage con la nueva partida
-    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
-    if (campeonatoGuardado) {
-      const campeonato = JSON.parse(campeonatoGuardado)
-      campeonato.partida_actual = nuevaPartida
-      localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
-    }
-
-    alert('Partida cerrada y nuevas parejas asignadas correctamente')
-    
-    // 5. Actualizar la ventana secundaria a la vista de asignación de mesas
-    if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
-      ventanaSecundaria.value.location.href = `/mesas/asignacion/${campeonatoId}`
-      vistaSecundaria.value = 'mesas' // Actualizar el estado del botón
-    }
-    
-    // 6. Redirigir la ventana principal a la página de asignación de mesas
-    router.push(`/mesas/asignacion/${campeonatoId}`)
   } catch (error) {
     console.error('Error:', error)
     alert('Error al cerrar la partida: ' + error.message)
@@ -383,9 +370,9 @@ const cambiarVista = (vista) => {
   if (!ventanaSecundaria.value || ventanaSecundaria.value.closed) {
     abrirVentanaSecundaria(vista)
   } else {
-    // Actualizar la URL de la ventana existente
+    // Actualizar la URL de la ventana existente con la partida actual
     const ruta = vista === 'ranking' 
-      ? `/resultados/ranking/${campeonatoId}`
+      ? `/resultados/ranking/${campeonatoId}?partida=${partidaActual.value}`
       : `/mesas/asignacion/${campeonatoId}`
     ventanaSecundaria.value.location.href = ruta
   }
@@ -400,7 +387,7 @@ const abrirVentanaSecundaria = (vista) => {
     if (ventanaExistente && !ventanaExistente.closed) {
       ventanaSecundaria.value = ventanaExistente
       const ruta = vista === 'ranking' 
-        ? `/resultados/ranking/${campeonatoId}`
+        ? `/resultados/ranking/${campeonatoId}?partida=${partidaActual.value}`
         : `/mesas/asignacion/${campeonatoId}`
       ventanaSecundaria.value.location.href = ruta
       return
@@ -408,7 +395,7 @@ const abrirVentanaSecundaria = (vista) => {
   }
 
   const ruta = vista === 'ranking' 
-    ? `/resultados/ranking/${campeonatoId}`
+    ? `/resultados/ranking/${campeonatoId}?partida=${partidaActual.value}`
     : `/mesas/asignacion/${campeonatoId}`
     
   // Abrir nueva ventana si no existe
@@ -424,24 +411,65 @@ const abrirVentanaSecundaria = (vista) => {
   }
 }
 
-// Abrir ventana de ranking al montar el componente
-onMounted(async () => {
-  const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
-  if (campeonatoGuardado) {
-    const campeonato = JSON.parse(campeonatoGuardado)
+// Función para forzar la recarga del estado del campeonato
+const recargarEstadoCampeonato = async () => {
+  try {
+    // Obtener la última partida con parejas asignadas
+    const responseUltimaPartida = await fetch(`http://localhost:8000/api/parejas-partida/ultima-partida/${campeonatoId}`)
+    if (!responseUltimaPartida.ok) {
+      throw new Error('Error al obtener la última partida')
+    }
+    const { ultima_partida } = await responseUltimaPartida.json()
+    
+    // Obtener el estado del campeonato
+    const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
+    if (!response.ok) {
+      throw new Error('Error al obtener información del campeonato')
+    }
+    const campeonato = await response.json()
+    console.log('Estado del campeonato recargado:', campeonato)
+    
+    // Asegurarnos de que la partida actual coincida con la última partida con parejas
     campeonatoSeleccionado.value = campeonato
-    partidaActual.value = campeonato.partida_actual || 1
-    esUltimaPartida.value = partidaActual.value === campeonato.numero_partidas
+    partidaActual.value = ultima_partida
+    
+    // Corregir el cálculo de última partida
+    esUltimaPartida.value = ultima_partida === campeonato.numero_partidas
+    
+    console.log('Partida actual:', partidaActual.value)
+    console.log('Número total de partidas:', campeonato.numero_partidas)
+    console.log('Es última partida:', esUltimaPartida.value)
+    
+    // Actualizar la vista secundaria si existe
+    if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
+      cambiarVista(vistaSecundaria.value)
+    }
+    
     await cargarMesas()
+  } catch (error) {
+    console.error('Error al recargar estado:', error)
+    alert('Error al recargar el estado del campeonato')
+  }
+}
+
+// Modificar onMounted para usar la nueva función
+onMounted(async () => {
+  try {
+    // Limpiar todo el localStorage relacionado con el campeonato
+    localStorage.clear()
+    
+    // Recargar el estado inicial
+    await recargarEstadoCampeonato()
     
     // Verificar si ya existe una ventana secundaria
     const ventanaGuardada = localStorage.getItem('ventanaSecundaria')
     if (!ventanaGuardada) {
-      // Solo abrir nueva ventana si no existe
       abrirVentanaSecundaria('ranking')
     }
-  } else {
-    console.error('No hay campeonato seleccionado')
+  } catch (error) {
+    console.error('Error al cargar el campeonato:', error)
+    alert('Error al cargar el campeonato: ' + error.message)
+    router.push('/')
   }
 })
 

@@ -101,72 +101,79 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/parejas-partida/siguiente-partida/{campeonato_id}/{partida_actual}", response_model=List[ParejaPartidaSchema])
+@router.post("/siguiente-partida/{campeonato_id}/{partida_actual}", response_model=List[ParejaPartidaSchema])
 def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db: Session = Depends(get_db)):
-    """Crea las parejas para la siguiente partida basándose en el ranking"""
+    """Crea las parejas para la siguiente partida basándose en el ranking.
     
-    # Calcular el ranking de jugadores
-    ranking = db.query(
-        Resultado.jugador_id,
-        func.sum(Resultado.PG).label('total_PG'),
-        func.sum(Resultado.PC).label('total_PC'),
-        func.sum(Resultado.PT).label('total_PT'),
-        func.sum(Resultado.MG).label('total_MG')  # Añadir MG al ranking
-    ).filter(
-        Resultado.campeonato_id == campeonato_id,
-        Resultado.partida <= partida_actual
-    ).group_by(
-        Resultado.jugador_id
-    ).order_by(
-        func.sum(Resultado.PG).desc(),
-        func.sum(Resultado.PC).desc(),
-        func.sum(Resultado.PT).desc(),
-        func.sum(Resultado.MG).desc()  # Ordenar también por MG
-    ).all()
-    
-    if not ranking:
-        raise HTTPException(status_code=404, detail="No se encontraron resultados para calcular el ranking")
-    
-    # Obtener lista ordenada de jugadores por ranking
-    jugadores_ordenados = [r[0] for r in ranking]  # Lista de IDs de jugadores ordenados por ranking
-    
-    parejas = []
-    num_mesas = len(jugadores_ordenados) // 4
-    siguiente_partida = partida_actual + 1
-    
-    # Crear parejas según el ranking
-    for mesa in range(1, num_mesas + 1):
-        idx_base = (mesa - 1) * 4
-        
-        # Pareja 1: jugador ranking impar (1,3)
-        pareja1 = ParejaPartida(
-            partida=siguiente_partida,
-            mesa=mesa,
-            jugador1_id=jugadores_ordenados[idx_base],      # Posición 4n+1 (1,5,9,...)
-            jugador2_id=jugadores_ordenados[idx_base + 2],  # Posición 4n+3 (3,7,11,...)
-            numero_pareja=1,
-            campeonato_id=campeonato_id
-        )
-        
-        # Pareja 2: jugador ranking par (2,4)
-        pareja2 = ParejaPartida(
-            partida=siguiente_partida,
-            mesa=mesa,
-            jugador1_id=jugadores_ordenados[idx_base + 1],  # Posición 4n+2 (2,6,10,...)
-            jugador2_id=jugadores_ordenados[idx_base + 3],  # Posición 4n+4 (4,8,12,...)
-            numero_pareja=2,
-            campeonato_id=campeonato_id
-        )
-        
-        db.add(pareja1)
-        db.add(pareja2)
-        parejas.extend([pareja1, pareja2])
-    
-    db.commit()
-    for pareja in parejas:
-        db.refresh(pareja)
-    
-    return parejas
+    La asignación sigue el siguiente patrón:
+    Mesa 1: Pareja 1 (1º y 3º) vs Pareja 2 (2º y 4º)
+    Mesa 2: Pareja 1 (5º y 7º) vs Pareja 2 (6º y 8º)
+    Mesa 3: Pareja 1 (9º y 11º) vs Pareja 2 (10º y 12º)
+    Y así sucesivamente...
+    """
+    try:
+        # Obtener el ranking actual usando los criterios correctos
+        ranking = db.query(
+            Resultado.jugador_id,
+            func.sum(Resultado.PG).label('total_PG'),
+            func.sum(Resultado.PC).label('total_PC'),
+            func.sum(Resultado.PT).label('total_PT'),
+            func.sum(Resultado.MG).label('total_MG')
+        ).filter(
+            Resultado.campeonato_id == campeonato_id,
+            Resultado.partida <= partida_actual
+        ).group_by(
+            Resultado.jugador_id
+        ).order_by(
+            func.sum(Resultado.PG).desc(),  # 1º criterio: PG descendente
+            func.sum(Resultado.PC).desc(),  # 2º criterio: PC descendente
+            func.sum(Resultado.PT).desc(),  # 3º criterio: PT descendente
+            func.sum(Resultado.MG),         # 4º criterio: MG ascendente
+            Resultado.jugador_id.asc()      # 5º criterio: ID del jugador ascendente para desempate
+        ).all()
+
+        if not ranking:
+            raise HTTPException(status_code=404, detail="No se encontraron resultados para calcular el ranking")
+
+        siguiente_partida = partida_actual + 1
+        jugadores_ordenados = [r[0] for r in ranking]
+        parejas = []
+        num_mesas = len(jugadores_ordenados) // 4
+
+        # Crear parejas para cada mesa
+        for mesa in range(num_mesas):
+            indice_base = mesa * 4  # Índice base para esta mesa
+            
+            # Pareja 1: jugadores en posiciones base y base+2 (1º y 3º, 5º y 7º, etc.)
+            pareja1 = ParejaPartida(
+                partida=siguiente_partida,
+                mesa=mesa + 1,
+                jugador1_id=jugadores_ordenados[indice_base],     # 1º, 5º, 9º...
+                jugador2_id=jugadores_ordenados[indice_base + 2], # 3º, 7º, 11º...
+                numero_pareja=1,
+                campeonato_id=campeonato_id
+            )
+            
+            # Pareja 2: jugadores en posiciones base+1 y base+3 (2º y 4º, 6º y 8º, etc.)
+            pareja2 = ParejaPartida(
+                partida=siguiente_partida,
+                mesa=mesa + 1,
+                jugador1_id=jugadores_ordenados[indice_base + 1], # 2º, 6º, 10º...
+                jugador2_id=jugadores_ordenados[indice_base + 3], # 4º, 8º, 12º...
+                numero_pareja=2,
+                campeonato_id=campeonato_id
+            )
+            
+            db.add(pareja1)
+            db.add(pareja2)
+            parejas.extend([pareja1, pareja2])
+
+        db.commit()
+        return parejas
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/campeonato/{campeonato_id}/partida/{partida}", response_model=List[ParejaPartidaSchema])
 def get_parejas_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
@@ -254,7 +261,12 @@ def asignar_parejas(datos: AsignacionParejas, db: Session = Depends(get_db)):
 def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
     """Obtiene el número de la última partida registrada para un campeonato"""
     try:
-        # Primero verificar si existen registros para este campeonato
+        # Verificar si el campeonato existe
+        campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+        if not campeonato:
+            raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+
+        # Verificar si existen registros para este campeonato
         existe_registro = db.query(ParejaPartida).filter(
             ParejaPartida.campeonato_id == campeonato_id
         ).first()
@@ -271,7 +283,8 @@ def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
             "tiene_registros": True
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error al obtener última partida: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener última partida: {str(e)}")
 
 @router.post("/partidas/cerrar/{campeonato_id}/{partida}")
 async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
@@ -295,6 +308,189 @@ async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends
     try:
         db.commit()
         return {"message": "Partida cerrada exitosamente", "nueva_partida": nueva_partida}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/corregir-asignacion/{campeonato_id}/{partida}", response_model=List[ParejaPartidaSchema])
+def corregir_asignacion_parejas(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Corrige la asignación de parejas de una partida específica según el ranking.
+    
+    La asignación sigue el siguiente patrón:
+    Mesa 1: Pareja 1 (1º y 3º) vs Pareja 2 (2º y 4º)
+    Mesa 2: Pareja 1 (5º y 7º) vs Pareja 2 (6º y 8º)
+    Mesa 3: Pareja 1 (9º y 11º) vs Pareja 2 (10º y 12º)
+    Y así sucesivamente...
+    
+    El orden de clasificación es:
+    1. Suma de PG (Partidas Ganadas) descendente
+    2. Suma de PC (Puntos Conseguidos) descendente
+    3. Suma de PT (Puntos Totales) descendente
+    4. Suma de MG (Manos Ganadas) ascendente
+    """
+    # Verificar si hay resultados registrados para esta partida
+    resultados_existentes = db.query(Resultado).filter(
+        Resultado.campeonato_id == campeonato_id,
+        Resultado.partida == partida
+    ).first()
+    
+    if resultados_existentes:
+        raise HTTPException(
+            status_code=400, 
+            detail="No se puede corregir la asignación porque ya hay resultados registrados para esta partida"
+        )
+    
+    # Calcular el ranking hasta la partida anterior usando los criterios correctos
+    ranking_query = db.query(
+        Resultado.jugador_id,
+        func.sum(Resultado.PG).label('total_PG'),
+        func.sum(Resultado.PC).label('total_PC'),
+        func.sum(Resultado.PT).label('total_PT'),
+        func.sum(Resultado.MG).label('total_MG')
+    ).filter(
+        Resultado.campeonato_id == campeonato_id,
+        Resultado.partida < partida  # Solo considerar partidas anteriores
+    ).group_by(
+        Resultado.jugador_id
+    ).order_by(
+        func.sum(Resultado.PG).desc(),  # 1º criterio: PG descendente
+        func.sum(Resultado.PC).desc(),  # 2º criterio: PC descendente
+        func.sum(Resultado.PT).desc(),  # 3º criterio: PT descendente
+        func.sum(Resultado.MG),         # 4º criterio: MG ascendente
+        Resultado.jugador_id.asc()      # 5º criterio: ID del jugador ascendente para desempate
+    )
+    
+    # Obtener los resultados completos para poder verificar empates
+    ranking_results = ranking_query.all()
+    
+    # Si es la primera partida y no hay ranking, usar el orden del sorteo inicial
+    if not ranking_results and partida == 1:
+        jugadores_ordenados = db.query(
+            ParejaPartida.jugador1_id
+        ).filter(
+            ParejaPartida.campeonato_id == campeonato_id,
+            ParejaPartida.partida == 1
+        ).order_by(
+            ParejaPartida.mesa,
+            ParejaPartida.numero_pareja
+        ).all()
+        jugadores_ordenados.extend(db.query(
+            ParejaPartida.jugador2_id
+        ).filter(
+            ParejaPartida.campeonato_id == campeonato_id,
+            ParejaPartida.partida == 1
+        ).order_by(
+            ParejaPartida.mesa,
+            ParejaPartida.numero_pareja
+        ).all())
+        jugadores_ordenados = [j[0] for j in jugadores_ordenados]
+    else:
+        # Extraer los IDs de los jugadores en el orden correcto
+        jugadores_ordenados = [r[0] for r in ranking_results]
+    
+    if not jugadores_ordenados:
+        raise HTTPException(status_code=404, detail="No se encontraron jugadores para realizar la asignación")
+    
+    # Eliminar las parejas existentes de esta partida
+    db.query(ParejaPartida).filter(
+        ParejaPartida.campeonato_id == campeonato_id,
+        ParejaPartida.partida == partida
+    ).delete()
+    
+    parejas = []
+    num_mesas = len(jugadores_ordenados) // 4
+    
+    # Crear todas las parejas
+    for mesa in range(num_mesas):
+        indice_base = mesa * 4  # Índice base para esta mesa
+        
+        # Pareja 1: jugadores en posiciones base y base+2 (1º y 3º, 5º y 7º, etc.)
+        pareja1 = ParejaPartida(
+            partida=partida,
+            mesa=mesa + 1,
+            jugador1_id=jugadores_ordenados[indice_base],     # 1º, 5º, 9º...
+            jugador2_id=jugadores_ordenados[indice_base + 2], # 3º, 7º, 11º...
+            numero_pareja=1,
+            campeonato_id=campeonato_id
+        )
+        
+        # Pareja 2: jugadores en posiciones base+1 y base+3 (2º y 4º, 6º y 8º, etc.)
+        pareja2 = ParejaPartida(
+            partida=partida,
+            mesa=mesa + 1,
+            jugador1_id=jugadores_ordenados[indice_base + 1], # 2º, 6º, 10º...
+            jugador2_id=jugadores_ordenados[indice_base + 3], # 4º, 8º, 12º...
+            numero_pareja=2,
+            campeonato_id=campeonato_id
+        )
+        
+        db.add(pareja1)
+        db.add(pareja2)
+        parejas.extend([pareja1, pareja2])
+    
+    db.commit()
+    
+    # Obtener todas las parejas creadas con la información de los jugadores
+    parejas = db.query(ParejaPartida).filter(
+        ParejaPartida.campeonato_id == campeonato_id,
+        ParejaPartida.partida == partida
+    ).order_by(
+        ParejaPartida.mesa,
+        ParejaPartida.numero_pareja
+    ).all()
+    
+    # Cargar la información de los jugadores
+    for pareja in parejas:
+        pareja.jugador1 = db.query(Jugador).filter(Jugador.id == pareja.jugador1_id).first()
+        pareja.jugador2 = db.query(Jugador).filter(Jugador.id == pareja.jugador2_id).first()
+    
+    return parejas 
+
+@router.post("/corregir-estado-campeonato/{campeonato_id}")
+async def corregir_estado_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
+    """Corrige el estado del campeonato basado en los datos reales de parejas_partida"""
+    try:
+        # Obtener la última partida que tiene parejas asignadas
+        ultima_partida = db.query(func.max(ParejaPartida.partida)).filter(
+            ParejaPartida.campeonato_id == campeonato_id
+        ).scalar()
+
+        if ultima_partida is None:
+            raise HTTPException(status_code=404, detail="No se encontraron partidas para este campeonato")
+
+        # Actualizar el campeonato con la partida actual correcta
+        campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+        if not campeonato:
+            raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+
+        campeonato.partida_actual = ultima_partida
+        db.commit()
+
+        return {
+            "message": "Estado del campeonato corregido",
+            "partida_actual": ultima_partida
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/actualizar-partida-actual/{campeonato_id}/{partida}")
+async def actualizar_partida_actual(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Actualiza manualmente la partida actual del campeonato"""
+    try:
+        campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+        if not campeonato:
+            raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+
+        campeonato.partida_actual = partida
+        db.commit()
+
+        return {
+            "message": "Partida actual actualizada correctamente",
+            "partida_actual": partida
+        }
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e)) 

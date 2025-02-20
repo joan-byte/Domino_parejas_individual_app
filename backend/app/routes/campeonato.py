@@ -120,4 +120,20 @@ def finalizar_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(campeonato)
     
-    return {"message": "Campeonato finalizado correctamente"} 
+    return {"message": "Campeonato finalizado correctamente"}
+
+@router.post("/{campeonato_id}/reactivar")
+async def reactivar_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
+    """Reactivar un campeonato que está marcado como finalizado"""
+    try:
+        campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+        if not campeonato:
+            raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+        
+        campeonato.finalizado = False
+        db.commit()
+        
+        return {"message": "Campeonato reactivado correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e)) 

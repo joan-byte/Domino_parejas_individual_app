@@ -7,6 +7,7 @@ class ResultadoBase(BaseModel):
     mesa: int
     jugador: int      # Número del jugador en la mesa (1-4)
     jugador_id: int   # ID del jugador en la base de datos
+    pareja: int      # 1 o 2 (número de la pareja en la mesa)
     PT: int          # Puntos Totales de su pareja
     PV: int          # Puntos Válidos (limitado por PM del campeonato)
     PC: int          # Puntos Conseguidos (PV propio - PV contrario)
