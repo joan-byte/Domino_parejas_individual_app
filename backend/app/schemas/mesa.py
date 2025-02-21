@@ -9,12 +9,12 @@ class MesaBase(BaseModel):
 
 class MesaCreate(MesaBase):
     pareja_partida1_id: int
-    pareja_partida2_id: int
+    pareja_partida2_id: Optional[int] = None  # Opcional para la última mesa
 
 class Mesa(MesaBase):
     id: int
     pareja_partida1: ParejaPartidaSchema
-    pareja_partida2: ParejaPartidaSchema
+    pareja_partida2: Optional[ParejaPartidaSchema] = None  # Opcional para la última mesa
 
     class Config:
         from_attributes = True 

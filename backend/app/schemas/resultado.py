@@ -19,14 +19,23 @@ class ResultadoMesaInput(BaseModel):
     campeonato_id: int
     partida: int
     mesa: int
+    # Jugadores de la primera pareja (siempre presentes)
     jugador1_id: int
     jugador2_id: int
-    jugador3_id: int
-    jugador4_id: int
-    puntos_pareja1: int
-    puntos_pareja2: int
-    mesas_ganadas_pareja1: int
-    mesas_ganadas_pareja2: int
+    # Jugadores restantes (pueden ser 0, 1 o 2)
+    jugador3_id: Optional[int] = None  # Tercer jugador (puede ser de la segunda pareja)
+    jugador4_id: Optional[int] = None  # Cuarto jugador (solo si hay segunda pareja completa)
+    # Puntos por jugador o pareja según el caso
+    puntos_pareja1: int  # Puntos de la primera pareja (siempre presente)
+    puntos_jugador3: Optional[int] = None  # Puntos del tercer jugador si existe
+    puntos_jugador4: Optional[int] = None  # Puntos del cuarto jugador si existe
+    # Manos ganadas
+    mesas_ganadas_pareja1: int  # Manos ganadas primera pareja
+    mesas_ganadas_jugador3: Optional[int] = None  # Manos ganadas tercer jugador
+    mesas_ganadas_jugador4: Optional[int] = None  # Manos ganadas cuarto jugador
+
+class ResultadoCreate(ResultadoBase):
+    pass
 
 class Resultado(ResultadoBase):
     id: int

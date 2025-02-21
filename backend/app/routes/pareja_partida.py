@@ -23,7 +23,8 @@ router = APIRouter(
 
 @router.post("/sorteo-inicial/")
 async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(get_db)):
-    """Realiza el sorteo inicial de parejas y mesas para la primera partida"""
+    """Realiza el sorteo inicial de parejas y mesas para la primera partida.
+    Los jugadores que no puedan formar una mesa completa quedarán sin asignar."""
     try:
         # Verificar que todos los jugadores estén activos
         jugadores_activos = db.query(Jugador).filter(
@@ -40,10 +41,6 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
                 detail=f"Los siguientes jugadores no están activos: {list(jugadores_inactivos)}"
             )
         
-        # Verificar número par de jugadores
-        if len(sorteo.jugadores) % 4 != 0:
-            raise HTTPException(status_code=400, detail="El número de jugadores debe ser múltiplo de 4")
-        
         # Mezclar aleatoriamente los jugadores
         jugadores = sorteo.jugadores.copy()
         random.shuffle(jugadores)
@@ -51,14 +48,16 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
         # Crear las parejas y asignar mesas
         mesa = 1
         parejas = []
+        jugadores_sin_asignar = []
         
-        # Procesar jugadores de 4 en 4 para formar las mesas
-        for i in range(0, len(jugadores), 4):
-            if i + 3 >= len(jugadores):
-                break
-            
+        # Procesar jugadores de 4 en 4 para formar las mesas completas
+        for i in range(0, len(jugadores) - 3, 4):  # Modificado para evitar índices fuera de rango
             # Mezclar los 4 jugadores de esta mesa para formar parejas aleatorias
             mesa_jugadores = jugadores[i:i+4]
+            if len(mesa_jugadores) < 4:  # Si no hay suficientes jugadores para una mesa completa
+                jugadores_sin_asignar.extend(mesa_jugadores)
+                break
+                
             random.shuffle(mesa_jugadores)
             
             # Crear primera pareja
@@ -84,6 +83,11 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
             parejas.extend([pareja1, pareja2])
             mesa += 1
         
+        # Agregar los últimos jugadores a la lista de sin asignar si no completan una mesa
+        if len(jugadores) % 4 != 0:
+            ultimo_indice = (len(jugadores) // 4) * 4
+            jugadores_sin_asignar.extend(jugadores[ultimo_indice:])
+        
         # Actualizar el campeonato a partida 1
         campeonato = db.query(Campeonato).filter(Campeonato.id == sorteo.campeonato_id).first()
         if not campeonato:
@@ -95,7 +99,11 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
             db.add(pareja)
         
         db.commit()
-        return {"message": "Sorteo inicial realizado con éxito"}
+        return {
+            "message": "Sorteo inicial realizado con éxito",
+            "jugadores_sin_asignar": jugadores_sin_asignar,
+            "mesas_formadas": mesa - 1
+        }
         
     except Exception as e:
         db.rollback()
@@ -104,6 +112,8 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
 @router.post("/siguiente-partida/{campeonato_id}/{partida_actual}", response_model=List[ParejaPartidaSchema])
 def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db: Session = Depends(get_db)):
     """Crea las parejas para la siguiente partida basándose en el ranking.
+    Solo se consideran jugadores activos para la asignación.
+    Los jugadores que no puedan formar una mesa completa quedarán sin asignar.
     
     La asignación sigue el siguiente patrón:
     Mesa 1: Pareja 1 (1º y 3º) vs Pareja 2 (2º y 4º)
@@ -112,7 +122,18 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
     Y así sucesivamente...
     """
     try:
-        # Obtener el ranking actual usando los criterios correctos
+        # Obtener solo jugadores activos
+        jugadores_activos = db.query(Jugador.id).filter(
+            Jugador.campeonato_id == campeonato_id,
+            Jugador.activo == True
+        ).all()
+        
+        if not jugadores_activos:
+            raise HTTPException(status_code=400, detail="No hay jugadores activos disponibles")
+            
+        jugadores_activos_ids = [j[0] for j in jugadores_activos]
+        
+        # Obtener el ranking actual usando los criterios correctos, solo para jugadores activos
         ranking = db.query(
             Resultado.jugador_id,
             func.sum(Resultado.PG).label('total_PG'),
@@ -121,7 +142,8 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
             func.sum(Resultado.MG).label('total_MG')
         ).filter(
             Resultado.campeonato_id == campeonato_id,
-            Resultado.partida <= partida_actual
+            Resultado.partida <= partida_actual,
+            Resultado.jugador_id.in_(jugadores_activos_ids)
         ).group_by(
             Resultado.jugador_id
         ).order_by(
@@ -138,11 +160,18 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
         siguiente_partida = partida_actual + 1
         jugadores_ordenados = [r[0] for r in ranking]
         parejas = []
+        jugadores_sin_asignar = []
         num_mesas = len(jugadores_ordenados) // 4
 
-        # Crear parejas para cada mesa
+        # Crear parejas para cada mesa completa
         for mesa in range(num_mesas):
             indice_base = mesa * 4  # Índice base para esta mesa
+            
+            # Verificar si hay suficientes jugadores para esta mesa
+            if indice_base + 3 >= len(jugadores_ordenados):
+                # Agregar los jugadores restantes a la lista de sin asignar
+                jugadores_sin_asignar.extend(jugadores_ordenados[indice_base:])
+                break
             
             # Pareja 1: jugadores en posiciones base y base+2 (1º y 3º, 5º y 7º, etc.)
             pareja1 = ParejaPartida(
@@ -168,8 +197,19 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
             db.add(pareja2)
             parejas.extend([pareja1, pareja2])
 
+        # Agregar los jugadores restantes a la lista de sin asignar
+        if len(jugadores_ordenados) % 4 != 0:
+            ultimo_indice = (len(jugadores_ordenados) // 4) * 4
+            jugadores_sin_asignar.extend(jugadores_ordenados[ultimo_indice:])
+
         db.commit()
-        return parejas
+        
+        # Devolver tanto las parejas formadas como los jugadores sin asignar
+        return {
+            "parejas": parejas,
+            "jugadores_sin_asignar": jugadores_sin_asignar,
+            "mesas_formadas": len(parejas) // 2
+        }
 
     except Exception as e:
         db.rollback()
@@ -224,8 +264,25 @@ def eliminar_parejas_partida(campeonato_id: int, partida: int, db: Session = Dep
 
 @router.post("/parejas-partida/asignar", response_model=List[ParejaPartidaSchema])
 def asignar_parejas(datos: AsignacionParejas, db: Session = Depends(get_db)):
-    """Asigna las parejas para una partida"""
+    """Asigna las parejas para una partida.
+    Solo permite asignar jugadores que estén activos."""
     try:
+        # Obtener jugadores activos
+        jugadores_activos = db.query(Jugador.id).filter(
+            Jugador.campeonato_id == datos.campeonato_id,
+            Jugador.activo == True
+        ).all()
+        
+        jugadores_activos_ids = {j[0] for j in jugadores_activos}
+        
+        # Verificar que todos los jugadores en las parejas estén activos
+        for pareja in datos.parejas:
+            if pareja.jugador1_id not in jugadores_activos_ids or pareja.jugador2_id not in jugadores_activos_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Solo se pueden asignar jugadores activos"
+                )
+        
         nuevas_parejas = []
         # Agrupar parejas por mesa
         parejas_por_mesa = {}

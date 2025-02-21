@@ -173,7 +173,11 @@ const props = defineProps({
     type: Number,
     required: true
   },
-  resultadoExistente: Object
+  resultadoExistente: Object,
+  esUltimaMesa: {
+    type: Boolean,
+    default: false
+  }
 })
 
 const emit = defineEmits(['close', 'resultadoRegistrado'])
@@ -278,12 +282,14 @@ const guardarResultados = async () => {
       mesa: parseInt(props.mesa.numeroMesa),
       jugador1_id: parseInt(props.mesa.pareja1.jugador1_id),
       jugador2_id: parseInt(props.mesa.pareja1.jugador2_id),
-      jugador3_id: parseInt(props.mesa.pareja2.jugador1_id),
-      jugador4_id: parseInt(props.mesa.pareja2.jugador2_id),
+      jugador3_id: props.mesa.pareja2?.jugador1_id ? parseInt(props.mesa.pareja2.jugador1_id) : null,
+      jugador4_id: props.mesa.pareja2?.jugador2_id ? parseInt(props.mesa.pareja2.jugador2_id) : null,
       puntos_pareja1: parseInt(puntosPareja1.value.PT) || 0,
-      puntos_pareja2: parseInt(puntosPareja2.value.PT) || 0,
+      puntos_jugador3: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.PT) || 0 : null,
+      puntos_jugador4: props.mesa.pareja2?.jugador2_id ? parseInt(puntosPareja2.value.PT) || 0 : null,
       mesas_ganadas_pareja1: parseInt(puntosPareja1.value.MG) || 0,
-      mesas_ganadas_pareja2: parseInt(puntosPareja2.value.MG) || 0
+      mesas_ganadas_jugador3: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.MG) || 0 : null,
+      mesas_ganadas_jugador4: props.mesa.pareja2?.jugador2_id ? parseInt(puntosPareja2.value.MG) || 0 : null
     }
 
     // Log de los datos antes de la validación
@@ -299,9 +305,8 @@ const guardarResultados = async () => {
     // Validar que todos los campos requeridos estén presentes y sean números
     const camposRequeridos = [
       'campeonato_id', 'partida', 'mesa', 
-      'jugador1_id', 'jugador2_id', 'jugador3_id', 'jugador4_id',
-      'puntos_pareja1', 'puntos_pareja2', 
-      'mesas_ganadas_pareja1', 'mesas_ganadas_pareja2'
+      'jugador1_id', 'jugador2_id',
+      'puntos_pareja1', 'mesas_ganadas_pareja1'
     ]
 
     const camposFaltantes = camposRequeridos.filter(campo => {
@@ -379,10 +384,31 @@ watch(() => props.show, (newVal) => {
   if (!newVal) {
     limpiarCampos()
   } else {
-    // Cuando se abre el popup, enfocamos el campo PT de la pareja 1
-    setTimeout(() => {
-      document.getElementById('pt-pareja1')?.focus()
-    }, 100)
+    // Si es la última mesa y tiene menos de 4 jugadores, asignar resultados automáticamente
+    if (props.esUltimaMesa && (!props.mesa.pareja2 || !props.mesa.pareja2.jugador1)) {
+      // Asignar la mitad del PM como PT
+      const ptAutomatico = Math.floor(campeonatoPM.value / 2)
+      puntosPareja1.value.PT = ptAutomatico
+      // MG es el entero redondeado hacia arriba de dividir PT entre 30
+      puntosPareja1.value.MG = Math.ceil(ptAutomatico / 30)
+      // PV es igual a PT
+      puntosPareja1.value.PV = ptAutomatico
+      // PG es 1
+      puntosPareja1.value.PG = 1
+      // PC es igual a PV
+      puntosPareja1.value.PC = ptAutomatico
+      
+      // Deshabilitar la edición de los campos
+      const inputs = document.querySelectorAll('.pareja-resultados input')
+      inputs.forEach(input => {
+        input.disabled = true
+      })
+    } else {
+      // Cuando se abre el popup normalmente, enfocamos el campo PT de la pareja 1
+      setTimeout(() => {
+        document.getElementById('pt-pareja1')?.focus()
+      }, 100)
+    }
   }
 })
 </script>

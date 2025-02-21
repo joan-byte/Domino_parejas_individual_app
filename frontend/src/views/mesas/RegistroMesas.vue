@@ -103,6 +103,7 @@
       :campeonato-id="campeonatoId"
       :partida-actual="partidaActual"
       :resultado-existente="resultadoExistente"
+      :es-ultima-mesa="mesaSeleccionada?.esUltimaMesa"
       @close="cerrarPopup"
       @resultado-registrado="onResultadoRegistrado"
     />
@@ -136,6 +137,9 @@ const ventanaSecundaria = ref(null)
 
 const abrirRegistro = (mesa) => {
   mesaSeleccionada.value = mesa
+  // Verificar si es la última mesa
+  const esUltima = mesa.numeroMesa === Math.max(...mesas.value.map(m => m.numeroMesa))
+  mesaSeleccionada.value.esUltimaMesa = esUltima
   showPopup.value = true
 }
 
@@ -244,6 +248,9 @@ const cargarResultadoMesa = async (mesa) => {
 
 const abrirModificacion = async (mesa) => {
   mesaSeleccionada.value = mesa
+  // Verificar si es la última mesa
+  const esUltima = mesa.numeroMesa === Math.max(...mesas.value.map(m => m.numeroMesa))
+  mesaSeleccionada.value.esUltimaMesa = esUltima
   resultadoExistente.value = await cargarResultadoMesa(mesa)
   showPopup.value = true
 }
@@ -306,10 +313,13 @@ const cerrarPartida = async () => {
       }
 
       alert('Campeonato finalizado correctamente')
+      
+      // Actualizar la ventana secundaria para mostrar el podium
       if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
-        ventanaSecundaria.value.close()
-        localStorage.removeItem('ventanaSecundaria')
+        ventanaSecundaria.value.location.href = `/resultados/podium/${campeonatoId}`
       }
+      
+      // Limpiar localStorage y redirigir la ventana principal
       localStorage.clear()
       router.push('/')
       return

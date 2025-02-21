@@ -10,7 +10,7 @@ class Resultado(Base):
     mesa = Column(Integer, nullable=False)
     jugador = Column(Integer, nullable=False)  # 1, 2, 3 o 4 (posición del jugador en la mesa)
     jugador_id = Column(Integer, nullable=False)
-    pareja = Column(Integer, nullable=False)  # 1 o 2 (número de la pareja en la mesa)
+    pareja = Column(Integer)  # 1 o 2 (número de la pareja en la mesa)
     PT = Column(Integer, nullable=False)  # Puntos Totales
     PV = Column(Integer, nullable=False)  # Puntos Válidos (limitado por PM del campeonato)
     PC = Column(Integer, nullable=False)  # Puntos Conseguidos (PV propio - PV contrario)

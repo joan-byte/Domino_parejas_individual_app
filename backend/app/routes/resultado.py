@@ -24,62 +24,134 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
     if not campeonato:
         raise HTTPException(status_code=404, detail="Campeonato no encontrado")
     
-    # Calcular PV para cada pareja usando el PM del campeonato
-    PV_pareja1 = calcular_PV(datos.puntos_pareja1, campeonato.PM)
-    PV_pareja2 = calcular_PV(datos.puntos_pareja2, campeonato.PM)
+    # Verificar si es la última mesa de la partida
+    ultima_mesa = db.query(func.max(ParejaPartida.mesa)).filter(
+        ParejaPartida.campeonato_id == datos.campeonato_id,
+        ParejaPartida.partida == datos.partida
+    ).scalar()
     
-    # Calcular PC para cada pareja
+    es_ultima_mesa = datos.mesa == ultima_mesa
+    
+    # Verificar si la última mesa tiene menos de 4 jugadores
+    if es_ultima_mesa:
+        pareja2_existe = datos.jugador3_id is not None and datos.jugador4_id is not None
+        
+        if not pareja2_existe:
+            # Asignar resultados automáticos para la pareja 1
+            PT_automatico = campeonato.PM // 2
+            MG_automatico = (PT_automatico + 29) // 30  # Redondeo hacia arriba
+            
+            # Crear solo los registros para la pareja 1
+            resultados = []
+            for num_jugador, jugador_id in [(1, datos.jugador1_id), (2, datos.jugador2_id)]:
+                resultado = Resultado(
+                    partida=datos.partida,
+                    mesa=datos.mesa,
+                    jugador=num_jugador,
+                    jugador_id=jugador_id,
+                    pareja=1,
+                    PT=PT_automatico,
+                    PV=PT_automatico,
+                    PC=PT_automatico,
+                    PG=1,
+                    MG=MG_automatico,
+                    campeonato_id=datos.campeonato_id
+                )
+                db.add(resultado)
+                resultados.append(resultado)
+            
+            db.commit()
+            for resultado in resultados:
+                db.refresh(resultado)
+            return resultados
+
+    # Proceder con la lógica normal para mesas completas o parcialmente completas
+    resultados = []
+    
+    # Calcular puntos totales para ambas parejas
+    PT_pareja1 = datos.puntos_pareja1
+    PT_pareja2 = datos.puntos_jugador3 if datos.jugador3_id is not None else 0  # Usar el PT del primer jugador de la pareja 2
+    
+    # Calcular PV para ambas parejas (limitado por PM)
+    PV_pareja1 = min(PT_pareja1, campeonato.PM)
+    PV_pareja2 = min(PT_pareja2, campeonato.PM)
+    
+    # Calcular PC (diferencia entre PV)
     PC_pareja1 = PV_pareja1 - PV_pareja2
     PC_pareja2 = PV_pareja2 - PV_pareja1
     
-    # Calcular PG para cada pareja
+    # Calcular PG (1 si PC > 0, 0 en otro caso)
     PG_pareja1 = 1 if PC_pareja1 > 0 else 0
     PG_pareja2 = 1 if PC_pareja2 > 0 else 0
     
-    # Crear los 4 registros (uno por cada jugador)
-    resultados = []
+    print(f"Calculando resultados para mesa {datos.mesa}:")
+    print(f"PT1: {PT_pareja1}, PT2: {PT_pareja2}")
+    print(f"PV1: {PV_pareja1}, PV2: {PV_pareja2}")
+    print(f"PC1: {PC_pareja1}, PC2: {PC_pareja2}")
+    print(f"PG1: {PG_pareja1}, PG2: {PG_pareja2}")
     
-    # Jugadores de la pareja 1
+    # Crear resultados para la primera pareja
     for num_jugador, jugador_id in [(1, datos.jugador1_id), (2, datos.jugador2_id)]:
         resultado = Resultado(
             partida=datos.partida,
             mesa=datos.mesa,
             jugador=num_jugador,
             jugador_id=jugador_id,
-            pareja=1,  # Asignar número de pareja 1
-            PT=datos.puntos_pareja1,  # Puntos totales de su pareja
-            PV=PV_pareja1,           # Puntos válidos de su pareja
-            PC=PC_pareja1,           # Puntos conseguidos por su pareja
-            PG=PG_pareja1,           # Si su pareja ganó
-            MG=datos.mesas_ganadas_pareja1,  # Mesas ganadas por su pareja
+            pareja=1,
+            PT=PT_pareja1,
+            PV=PV_pareja1,
+            PC=PC_pareja1,
+            PG=PG_pareja1,
+            MG=datos.mesas_ganadas_pareja1,
             campeonato_id=datos.campeonato_id
         )
         db.add(resultado)
         resultados.append(resultado)
     
-    # Jugadores de la pareja 2
-    for num_jugador, jugador_id in [(3, datos.jugador3_id), (4, datos.jugador4_id)]:
+    # Crear resultados para la segunda pareja si existen jugadores
+    if datos.jugador3_id is not None:
         resultado = Resultado(
             partida=datos.partida,
             mesa=datos.mesa,
-            jugador=num_jugador,
-            jugador_id=jugador_id,
-            pareja=2,  # Asignar número de pareja 2
-            PT=datos.puntos_pareja2,  # Puntos totales de su pareja
-            PV=PV_pareja2,           # Puntos válidos de su pareja
-            PC=PC_pareja2,           # Puntos conseguidos por su pareja
-            PG=PG_pareja2,           # Si su pareja ganó
-            MG=datos.mesas_ganadas_pareja2,  # Mesas ganadas por su pareja
+            jugador=3,
+            jugador_id=datos.jugador3_id,
+            pareja=2,
+            PT=PT_pareja2,  # Usar PT_pareja2 en lugar de datos.puntos_jugador3
+            PV=PV_pareja2,
+            PC=PC_pareja2,
+            PG=PG_pareja2,
+            MG=datos.mesas_ganadas_jugador3 or 0,
             campeonato_id=datos.campeonato_id
         )
         db.add(resultado)
         resultados.append(resultado)
     
-    db.commit()
-    for resultado in resultados:
-        db.refresh(resultado)
+    if datos.jugador4_id is not None:
+        resultado = Resultado(
+            partida=datos.partida,
+            mesa=datos.mesa,
+            jugador=4,
+            jugador_id=datos.jugador4_id,
+            pareja=2,
+            PT=PT_pareja2,  # Usar PT_pareja2 en lugar de datos.puntos_jugador4
+            PV=PV_pareja2,
+            PC=PC_pareja2,
+            PG=PG_pareja2,
+            MG=datos.mesas_ganadas_jugador4 or 0,
+            campeonato_id=datos.campeonato_id
+        )
+        db.add(resultado)
+        resultados.append(resultado)
     
-    return resultados
+    try:
+        db.commit()
+        for resultado in resultados:
+            db.refresh(resultado)
+        return resultados
+    except Exception as e:
+        db.rollback()
+        print(f"Error al guardar resultados: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al guardar resultados: {str(e)}")
 
 @router.get("/resultados/", response_model=List[ResultadoSchema])
 def read_resultados(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -89,14 +161,31 @@ def read_resultados(skip: int = 0, limit: int = 100, db: Session = Depends(get_d
 @router.get("/resultados/campeonato/{campeonato_id}/partida/{partida}", response_model=List[ResultadoSchema])
 def read_resultados_by_campeonato_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
     """Obtiene todos los resultados de una partida en un campeonato"""
-    resultados = db.query(Resultado).join(
-        Jugador, Resultado.jugador_id == Jugador.id
-    ).filter(
-        Resultado.campeonato_id == campeonato_id,
-        Resultado.partida == partida
-    ).order_by(Resultado.mesa, Resultado.jugador).all()
-    
-    return resultados
+    try:
+        resultados = db.query(
+            Resultado.id,
+            Resultado.partida,
+            Resultado.mesa,
+            Resultado.jugador,
+            Resultado.jugador_id,
+            Resultado.pareja,
+            Resultado.PT,
+            Resultado.PV,
+            Resultado.PC,
+            Resultado.PG,
+            Resultado.MG,
+            Resultado.campeonato_id
+        ).join(
+            Jugador, Resultado.jugador_id == Jugador.id
+        ).filter(
+            Resultado.campeonato_id == campeonato_id,
+            Resultado.partida == partida
+        ).order_by(Resultado.mesa, Resultado.jugador).all()
+        
+        return resultados
+    except Exception as e:
+        print(f"Error en read_resultados_by_campeonato_partida: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener resultados: {str(e)}")
 
 @router.get("/resultados/jugador/{jugador_id}/campeonato/{campeonato_id}", response_model=List[ResultadoSchema])
 def read_resultados_by_jugador_campeonato(jugador_id: int, campeonato_id: int, db: Session = Depends(get_db)):
@@ -204,7 +293,11 @@ async def get_ranking_campeonato(campeonato_id: int, partida: int = None, db: Se
 
         # Si se especifica una partida, verificar si tiene resultados
         if partida is not None:
-            resultados_partida = db.query(Resultado).filter(
+            resultados_partida = db.query(
+                Resultado.id,
+                Resultado.partida,
+                Resultado.jugador_id
+            ).filter(
                 Resultado.campeonato_id == campeonato_id,
                 Resultado.partida == partida
             ).first()
