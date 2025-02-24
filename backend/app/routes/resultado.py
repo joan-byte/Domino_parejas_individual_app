@@ -32,71 +32,98 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
     
     es_ultima_mesa = datos.mesa == ultima_mesa
     
-    # Verificar si la última mesa tiene menos de 4 jugadores
-    if es_ultima_mesa:
-        pareja2_existe = datos.jugador3_id is not None and datos.jugador4_id is not None
+    # Validar que los datos coincidan con es_ultima_mesa
+    if es_ultima_mesa != datos.es_ultima_mesa:
+        raise HTTPException(
+            status_code=400, 
+            detail="El indicador es_ultima_mesa no coincide con la mesa actual"
+        )
+    
+    # Si no es la última mesa, validar que tenga 4 jugadores
+    if not es_ultima_mesa:
+        if not all([datos.jugador1_id, datos.jugador2_id, datos.jugador3_id, datos.jugador4_id]):
+            raise HTTPException(
+                status_code=400,
+                detail="Las mesas que no son la última deben tener 4 jugadores"
+            )
+    
+    # Inicializar lista de resultados
+    resultados = []
+    
+    # Verificar si la última mesa está incompleta
+    es_mesa_incompleta = es_ultima_mesa and (
+        datos.jugador2_id is None or 
+        datos.jugador3_id is None or 
+        (datos.jugador3_id is not None and datos.jugador4_id is None)
+    )
+    
+    if es_mesa_incompleta:
+        # Calcular puntos automáticos para mesa incompleta
+        PT_automatico = (campeonato.PM + 1) // 2  # Redondeo hacia arriba
+        PV_automatico = PT_automatico
+        PC_automatico = PT_automatico
+        PG_automatico = 1
+        MG_automatico = (PT_automatico + 29) // 30  # Redondeo hacia arriba
         
-        if not pareja2_existe:
-            # Asignar resultados automáticos para la pareja 1
-            PT_automatico = campeonato.PM // 2
-            MG_automatico = (PT_automatico + 29) // 30  # Redondeo hacia arriba
-            
-            # Crear solo los registros para la pareja 1
-            resultados = []
-            for num_jugador, jugador_id in [(1, datos.jugador1_id), (2, datos.jugador2_id)]:
+        # Crear resultados para todos los jugadores presentes con los mismos valores
+        jugadores = [
+            (1, datos.jugador1_id),
+            (2, datos.jugador2_id),
+            (3, datos.jugador3_id),
+            (4, datos.jugador4_id)
+        ]
+        
+        for num_jugador, jugador_id in jugadores:
+            if jugador_id is not None:
+                pareja = 1 if num_jugador <= 2 else 2
                 resultado = Resultado(
                     partida=datos.partida,
                     mesa=datos.mesa,
                     jugador=num_jugador,
                     jugador_id=jugador_id,
-                    pareja=1,
+                    pareja=pareja,
                     PT=PT_automatico,
-                    PV=PT_automatico,
-                    PC=PT_automatico,
-                    PG=1,
+                    PV=PV_automatico,
+                    PC=PC_automatico,
+                    PG=PG_automatico,
                     MG=MG_automatico,
                     campeonato_id=datos.campeonato_id
                 )
                 db.add(resultado)
                 resultados.append(resultado)
-            
-            db.commit()
-            for resultado in resultados:
-                db.refresh(resultado)
-            return resultados
-
-    # Proceder con la lógica normal para mesas completas o parcialmente completas
-    resultados = []
-    
-    # Calcular puntos totales para ambas parejas
-    PT_pareja1 = datos.puntos_pareja1
-    PT_pareja2 = datos.puntos_jugador3 if datos.jugador3_id is not None else 0  # Usar el PT del primer jugador de la pareja 2
-    
-    # Calcular PV para ambas parejas (limitado por PM)
-    PV_pareja1 = min(PT_pareja1, campeonato.PM)
-    PV_pareja2 = min(PT_pareja2, campeonato.PM)
-    
-    # Calcular PC (diferencia entre PV)
-    PC_pareja1 = PV_pareja1 - PV_pareja2
-    PC_pareja2 = PV_pareja2 - PV_pareja1
-    
-    # Calcular PG (1 si PC > 0, 0 en otro caso)
-    PG_pareja1 = 1 if PC_pareja1 > 0 else 0
-    PG_pareja2 = 1 if PC_pareja2 > 0 else 0
-    
-    print(f"Calculando resultados para mesa {datos.mesa}:")
-    print(f"PT1: {PT_pareja1}, PT2: {PT_pareja2}")
-    print(f"PV1: {PV_pareja1}, PV2: {PV_pareja2}")
-    print(f"PC1: {PC_pareja1}, PC2: {PC_pareja2}")
-    print(f"PG1: {PG_pareja1}, PG2: {PG_pareja2}")
-    
-    # Crear resultados para la primera pareja
-    for num_jugador, jugador_id in [(1, datos.jugador1_id), (2, datos.jugador2_id)]:
+    else:
+        # Proceder con la lógica normal para mesas completas
+        # Calcular puntos para la primera pareja
+        PT_pareja1 = datos.puntos_pareja1
+        PV_pareja1 = min(PT_pareja1, campeonato.PM)
+        
+        # Calcular puntos para la segunda pareja si existe
+        PT_pareja2 = datos.puntos_pareja2 if datos.puntos_pareja2 is not None else 0
+        PV_pareja2 = min(PT_pareja2, campeonato.PM) if datos.puntos_pareja2 is not None else 0
+        
+        # Calcular PC y PG para ambas parejas
+        if datos.jugador3_id is not None:  # Si hay al menos un jugador en la segunda pareja
+            PC_pareja1 = PV_pareja1 - PV_pareja2
+            PC_pareja2 = PV_pareja2 - PV_pareja1
+            PG_pareja1 = 1 if PC_pareja1 > 0 else 0
+            PG_pareja2 = 1 if PC_pareja2 > 0 else 0
+        else:  # Si no hay segunda pareja (solo posible en última mesa completa)
+            if not es_ultima_mesa:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Solo la última mesa puede tener una sola pareja"
+                )
+            PC_pareja1 = PV_pareja1
+            PG_pareja1 = 1
+            PC_pareja2 = 0
+            PG_pareja2 = 0
+        
+        # Crear resultados para la primera pareja
         resultado = Resultado(
             partida=datos.partida,
             mesa=datos.mesa,
-            jugador=num_jugador,
-            jugador_id=jugador_id,
+            jugador=1,
+            jugador_id=datos.jugador1_id,
             pareja=1,
             PT=PT_pareja1,
             PV=PV_pareja1,
@@ -107,41 +134,73 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
         )
         db.add(resultado)
         resultados.append(resultado)
-    
-    # Crear resultados para la segunda pareja si existen jugadores
-    if datos.jugador3_id is not None:
-        resultado = Resultado(
-            partida=datos.partida,
-            mesa=datos.mesa,
-            jugador=3,
-            jugador_id=datos.jugador3_id,
-            pareja=2,
-            PT=PT_pareja2,  # Usar PT_pareja2 en lugar de datos.puntos_jugador3
-            PV=PV_pareja2,
-            PC=PC_pareja2,
-            PG=PG_pareja2,
-            MG=datos.mesas_ganadas_jugador3 or 0,
-            campeonato_id=datos.campeonato_id
-        )
-        db.add(resultado)
-        resultados.append(resultado)
-    
-    if datos.jugador4_id is not None:
-        resultado = Resultado(
-            partida=datos.partida,
-            mesa=datos.mesa,
-            jugador=4,
-            jugador_id=datos.jugador4_id,
-            pareja=2,
-            PT=PT_pareja2,  # Usar PT_pareja2 en lugar de datos.puntos_jugador4
-            PV=PV_pareja2,
-            PC=PC_pareja2,
-            PG=PG_pareja2,
-            MG=datos.mesas_ganadas_jugador4 or 0,
-            campeonato_id=datos.campeonato_id
-        )
-        db.add(resultado)
-        resultados.append(resultado)
+        
+        if datos.jugador2_id is not None:
+            resultado = Resultado(
+                partida=datos.partida,
+                mesa=datos.mesa,
+                jugador=2,
+                jugador_id=datos.jugador2_id,
+                pareja=1,
+                PT=PT_pareja1,
+                PV=PV_pareja1,
+                PC=PC_pareja1,
+                PG=PG_pareja1,
+                MG=datos.mesas_ganadas_pareja1,
+                campeonato_id=datos.campeonato_id
+            )
+            db.add(resultado)
+            resultados.append(resultado)
+        elif not es_ultima_mesa:
+            raise HTTPException(
+                status_code=400,
+                detail="Las mesas que no son la última deben tener pareja completa"
+            )
+        
+        # Crear resultados para la segunda pareja si existe
+        if datos.jugador3_id is not None:
+            resultado = Resultado(
+                partida=datos.partida,
+                mesa=datos.mesa,
+                jugador=3,
+                jugador_id=datos.jugador3_id,
+                pareja=2,
+                PT=PT_pareja2,
+                PV=PV_pareja2,
+                PC=PC_pareja2,
+                PG=PG_pareja2,
+                MG=datos.mesas_ganadas_pareja2 or 0,
+                campeonato_id=datos.campeonato_id
+            )
+            db.add(resultado)
+            resultados.append(resultado)
+            
+            if datos.jugador4_id is not None:
+                resultado = Resultado(
+                    partida=datos.partida,
+                    mesa=datos.mesa,
+                    jugador=4,
+                    jugador_id=datos.jugador4_id,
+                    pareja=2,
+                    PT=PT_pareja2,
+                    PV=PV_pareja2,
+                    PC=PC_pareja2,
+                    PG=PG_pareja2,
+                    MG=datos.mesas_ganadas_pareja2 or 0,
+                    campeonato_id=datos.campeonato_id
+                )
+                db.add(resultado)
+                resultados.append(resultado)
+            elif not es_ultima_mesa:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Las mesas que no son la última deben tener parejas completas"
+                )
+        elif not es_ultima_mesa:
+            raise HTTPException(
+                status_code=400,
+                detail="Las mesas que no son la última deben tener dos parejas"
+            )
     
     try:
         db.commit()

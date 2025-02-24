@@ -6,13 +6,15 @@
       <div class="resultados-container">
         <div class="pareja-resultados">
           <div class="pareja-info">
-            <div class="jugador">
+            <div class="jugador" v-if="mesa.pareja1?.jugador1">
               {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
             </div>
-            <div class="jugador-separator">/</div>
-            <div class="jugador">
-              {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
-            </div>
+            <template v-if="mesa.pareja1?.jugador2">
+              <div class="jugador-separator">/</div>
+              <div class="jugador">
+                {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
+              </div>
+            </template>
           </div>
           <div class="puntos-row">
             <div class="input-group">
@@ -74,15 +76,17 @@
 
         <div class="separador">VS</div>
 
-        <div class="pareja-resultados">
+        <div class="pareja-resultados" v-if="mesa.pareja2?.jugador1">
           <div class="pareja-info">
             <div class="jugador">
               {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
             </div>
-            <div class="jugador-separator">/</div>
-            <div class="jugador">
-              {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
-            </div>
+            <template v-if="mesa.pareja2?.jugador2">
+              <div class="jugador-separator">/</div>
+              <div class="jugador">
+                {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
+              </div>
+            </template>
           </div>
           <div class="puntos-row">
             <div class="input-group">
@@ -141,9 +145,14 @@
             </div>
           </div>
         </div>
+        <div class="pareja-resultados empty-pareja" v-else>
+          <div class="no-jugadores-mensaje">
+            No hay jugadores en la segunda pareja
+          </div>
+        </div>
       </div>
 
-      <div class="error-message" v-if="pvIguales">
+      <div class="error-message" v-if="pvIguales && !esUltimaMesaIncompleta">
         Los PV no pueden ser iguales
       </div>
 
@@ -151,7 +160,7 @@
         <button 
           @click="guardarResultados" 
           class="btn-guardar"
-          :disabled="pvIguales"
+          :disabled="pvIguales && !esUltimaMesaIncompleta"
         >
           Guardar
         </button>
@@ -187,8 +196,12 @@ const puntosPareja2 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
 const campeonatoPM = ref(300) // Valor por defecto
 
 const pvIguales = computed(() => {
-  return puntosPareja1.value.PV === puntosPareja2.value.PV && 
-         puntosPareja1.value.PV !== 0
+  // Solo validar PV iguales si la mesa está completa (tiene 4 jugadores)
+  const mesaCompleta = props.mesa.pareja1?.jugador1 && props.mesa.pareja1?.jugador2 && 
+                      props.mesa.pareja2?.jugador1 && props.mesa.pareja2?.jugador2;
+  return mesaCompleta && 
+         puntosPareja1.value.PV === puntosPareja2.value.PV && 
+         puntosPareja1.value.PV !== 0;
 })
 
 // Crear el bus de eventos para actualizar el ranking
@@ -242,19 +255,25 @@ const calcularPuntos = (parejaNum) => {
 const validarPuntos = () => {
   // Validar que los puntos totales estén dentro del rango (0 a 2*PM)
   if (puntosPareja1.value.PT < 0 || puntosPareja1.value.PT > campeonatoPM.value * 2 ||
-      puntosPareja2.value.PT < 0 || puntosPareja2.value.PT > campeonatoPM.value * 2) {
+      (props.mesa.pareja2?.jugador1 && (puntosPareja2.value.PT < 0 || puntosPareja2.value.PT > campeonatoPM.value * 2))) {
+    alert('Los puntos totales deben estar entre 0 y ' + (campeonatoPM.value * 2))
     return false
   }
 
   // Validar que las manos ganadas estén dentro del rango (0-20)
   if (puntosPareja1.value.MG < 0 || puntosPareja1.value.MG > 20 ||
-      puntosPareja2.value.MG < 0 || puntosPareja2.value.MG > 20) {
+      (props.mesa.pareja2?.jugador1 && (puntosPareja2.value.MG < 0 || puntosPareja2.value.MG > 20))) {
+    alert('Las manos ganadas deben estar entre 0 y 20')
     return false
   }
 
-  // Validar que los PV no sean iguales
-  if (puntosPareja1.value.PV === puntosPareja2.value.PV && 
+  // Solo validar PV iguales si la mesa está completa (tiene 4 jugadores)
+  const mesaCompleta = props.mesa.pareja1?.jugador1 && props.mesa.pareja1?.jugador2 && 
+                      props.mesa.pareja2?.jugador1 && props.mesa.pareja2?.jugador2;
+  
+  if (mesaCompleta && puntosPareja1.value.PV === puntosPareja2.value.PV && 
       puntosPareja1.value.PV !== 0) {
+    alert('Los PV no pueden ser iguales en una mesa completa')
     return false
   }
 
@@ -280,16 +299,15 @@ const guardarResultados = async () => {
       campeonato_id: parseInt(props.campeonatoId),
       partida: parseInt(props.partidaActual),
       mesa: parseInt(props.mesa.numeroMesa),
+      es_ultima_mesa: props.esUltimaMesa,
       jugador1_id: parseInt(props.mesa.pareja1.jugador1_id),
       jugador2_id: parseInt(props.mesa.pareja1.jugador2_id),
       jugador3_id: props.mesa.pareja2?.jugador1_id ? parseInt(props.mesa.pareja2.jugador1_id) : null,
       jugador4_id: props.mesa.pareja2?.jugador2_id ? parseInt(props.mesa.pareja2.jugador2_id) : null,
       puntos_pareja1: parseInt(puntosPareja1.value.PT) || 0,
-      puntos_jugador3: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.PT) || 0 : null,
-      puntos_jugador4: props.mesa.pareja2?.jugador2_id ? parseInt(puntosPareja2.value.PT) || 0 : null,
+      puntos_pareja2: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.PT) || 0 : null,
       mesas_ganadas_pareja1: parseInt(puntosPareja1.value.MG) || 0,
-      mesas_ganadas_jugador3: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.MG) || 0 : null,
-      mesas_ganadas_jugador4: props.mesa.pareja2?.jugador2_id ? parseInt(puntosPareja2.value.MG) || 0 : null
+      mesas_ganadas_pareja2: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.MG) || 0 : null
     }
 
     // Log de los datos antes de la validación
@@ -379,30 +397,50 @@ const cerrar = () => {
   emit('close')
 }
 
-// Limpiar campos cuando se cierra el popup
+// Añadir computed property para detectar si es una mesa incompleta
+const esUltimaMesaIncompleta = computed(() => {
+  return props.esUltimaMesa && (
+    !props.mesa.pareja2?.jugador1 || 
+    !props.mesa.pareja1?.jugador2 ||
+    !props.mesa.pareja2?.jugador2
+  )
+})
+
+// Modificar el watch del show
 watch(() => props.show, (newVal) => {
   if (!newVal) {
     limpiarCampos()
   } else {
-    // Si es la última mesa y tiene menos de 4 jugadores, asignar resultados automáticamente
-    if (props.esUltimaMesa && (!props.mesa.pareja2 || !props.mesa.pareja2.jugador1)) {
-      // Asignar la mitad del PM como PT
+    // Si es la última mesa y está incompleta
+    if (esUltimaMesaIncompleta.value) {
+      // Asignar la mitad del PM como PT para la pareja que tiene jugadores
       const ptAutomatico = Math.floor(campeonatoPM.value / 2)
-      puntosPareja1.value.PT = ptAutomatico
-      // MG es el entero redondeado hacia arriba de dividir PT entre 30
-      puntosPareja1.value.MG = Math.ceil(ptAutomatico / 30)
-      // PV es igual a PT
-      puntosPareja1.value.PV = ptAutomatico
-      // PG es 1
-      puntosPareja1.value.PG = 1
-      // PC es igual a PV
-      puntosPareja1.value.PC = ptAutomatico
+      
+      // Asignar puntos a la primera pareja si tiene al menos un jugador
+      if (props.mesa.pareja1?.jugador1) {
+        puntosPareja1.value.PT = ptAutomatico
+        puntosPareja1.value.MG = Math.ceil(ptAutomatico / 30)
+        puntosPareja1.value.PV = ptAutomatico
+        puntosPareja1.value.PG = 1
+        puntosPareja1.value.PC = ptAutomatico
+      }
+      
+      // Si hay segunda pareja, asignar puntos también
+      if (props.mesa.pareja2?.jugador1) {
+        puntosPareja2.value.PT = ptAutomatico
+        puntosPareja2.value.MG = Math.ceil(ptAutomatico / 30)
+        puntosPareja2.value.PV = ptAutomatico
+        puntosPareja2.value.PG = 1
+        puntosPareja2.value.PC = ptAutomatico
+      }
       
       // Deshabilitar la edición de los campos
-      const inputs = document.querySelectorAll('.pareja-resultados input')
-      inputs.forEach(input => {
-        input.disabled = true
-      })
+      setTimeout(() => {
+        const inputs = document.querySelectorAll('.pareja-resultados input')
+        inputs.forEach(input => {
+          input.disabled = true
+        })
+      }, 100)
     } else {
       // Cuando se abre el popup normalmente, enfocamos el campo PT de la pareja 1
       setTimeout(() => {
@@ -567,5 +605,19 @@ button {
 
 .btn-cancelar:hover {
   background-color: #e0e0e0;
+}
+
+.empty-pareja {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  background-color: #f8f9fa;
+}
+
+.no-jugadores-mensaje {
+  color: #666;
+  font-style: italic;
+  text-align: center;
 }
 </style> 
