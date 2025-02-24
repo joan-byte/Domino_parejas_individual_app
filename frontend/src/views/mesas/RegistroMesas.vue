@@ -43,26 +43,30 @@
             <div class="pareja-info">
               <span class="pareja-label">Pareja 1:</span>
               <div class="jugadores">
-                <span class="jugador">
+                <span class="jugador" v-if="mesa.pareja1?.jugador1">
                   {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
                 </span>
-                <span class="jugador-separator">/</span>
-                <span class="jugador">
-                  {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
-                </span>
+                <template v-if="mesa.pareja1?.jugador2">
+                  <span class="jugador-separator">/</span>
+                  <span class="jugador">
+                    {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
+                  </span>
+                </template>
               </div>
             </div>
             <div class="separator">vs</div>
             <div class="pareja-info">
               <span class="pareja-label">Pareja 2:</span>
               <div class="jugadores">
-                <span class="jugador">
+                <span class="jugador" v-if="mesa.pareja2?.jugador1">
                   {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
                 </span>
-                <span class="jugador-separator">/</span>
-                <span class="jugador">
-                  {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
-                </span>
+                <template v-if="mesa.pareja2?.jugador2">
+                  <span class="jugador-separator">/</span>
+                  <span class="jugador">
+                    {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
+                  </span>
+                </template>
               </div>
             </div>
           </div>
@@ -198,9 +202,8 @@ const cargarMesas = async () => {
       }
     })
     
-    // Convertir el Map a un array y filtrar mesas incompletas
+    // Convertir el Map a un array y ordenar por número de mesa
     mesas.value = Array.from(mesasTemp.values())
-      .filter(mesa => mesa.pareja1 && mesa.pareja2)
       .sort((a, b) => a.numeroMesa - b.numeroMesa)
     
     await verificarMesasRegistradas()
@@ -354,6 +357,9 @@ const cerrarPartida = async () => {
       await recargarEstadoCampeonato()
 
       alert('Partida cerrada y nuevas parejas asignadas correctamente')
+      
+      // Disparar evento para actualizar la asignación de mesas
+      window.dispatchEvent(new Event('update-asignacion-mesas'))
       
       // Actualizar la ventana secundaria
       if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {

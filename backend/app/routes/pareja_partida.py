@@ -11,7 +11,8 @@ from app.schemas.pareja_partida import (
     ParejaPartida as ParejaPartidaSchema,
     SorteoInicial,
     AsignacionParejas,
-    ParejaNueva
+    ParejaNueva,
+    SiguientePartidaResponse
 )
 from app.models.jugador import Jugador
 from app.models.campeonato import Campeonato
@@ -109,11 +110,11 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/siguiente-partida/{campeonato_id}/{partida_actual}", response_model=List[ParejaPartidaSchema])
+@router.post("/siguiente-partida/{campeonato_id}/{partida_actual}", response_model=SiguientePartidaResponse)
 def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db: Session = Depends(get_db)):
     """Crea las parejas para la siguiente partida basándose en el ranking.
     Solo se consideran jugadores activos para la asignación.
-    Los jugadores que no puedan formar una mesa completa quedarán sin asignar.
+    La última mesa puede tener de 1 a 4 jugadores.
     
     La asignación sigue el siguiente patrón:
     Mesa 1: Pareja 1 (1º y 3º) vs Pareja 2 (2º y 4º)
@@ -122,6 +123,24 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
     Y así sucesivamente...
     """
     try:
+        # Obtener la última partida asignada en la base de datos
+        ultima_partida = db.query(func.max(ParejaPartida.partida)).filter(
+            ParejaPartida.campeonato_id == campeonato_id
+        ).scalar()
+        
+        # Si no hay partidas previas, comenzar desde la partida 1
+        if ultima_partida is None:
+            siguiente_partida = 1
+        else:
+            siguiente_partida = ultima_partida + 1
+
+        # Verificar que el campeonato existe y actualizar su partida actual
+        campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+        if not campeonato:
+            raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+            
+        campeonato.partida_actual = siguiente_partida
+        
         # Obtener solo jugadores activos
         jugadores_activos = db.query(Jugador.id).filter(
             Jugador.campeonato_id == campeonato_id,
@@ -142,53 +161,52 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
             func.sum(Resultado.MG).label('total_MG')
         ).filter(
             Resultado.campeonato_id == campeonato_id,
-            Resultado.partida <= partida_actual,
+            Resultado.partida < siguiente_partida,
             Resultado.jugador_id.in_(jugadores_activos_ids)
         ).group_by(
             Resultado.jugador_id
         ).order_by(
-            func.sum(Resultado.PG).desc(),  # 1º criterio: PG descendente
-            func.sum(Resultado.PC).desc(),  # 2º criterio: PC descendente
-            func.sum(Resultado.PT).desc(),  # 3º criterio: PT descendente
-            func.sum(Resultado.MG),         # 4º criterio: MG ascendente
-            Resultado.jugador_id.asc()      # 5º criterio: ID del jugador ascendente para desempate
+            func.sum(Resultado.PG).desc(),
+            func.sum(Resultado.PC).desc(),
+            func.sum(Resultado.PT).desc(),
+            func.sum(Resultado.MG),
+            Resultado.jugador_id.asc()
         ).all()
 
+        # Si no hay ranking (primera partida), obtener jugadores en orden aleatorio
         if not ranking:
-            raise HTTPException(status_code=404, detail="No se encontraron resultados para calcular el ranking")
+            jugadores_ordenados = [j[0] for j in jugadores_activos]
+            random.shuffle(jugadores_ordenados)
+        else:
+            jugadores_ordenados = [r[0] for r in ranking]
 
-        siguiente_partida = partida_actual + 1
-        jugadores_ordenados = [r[0] for r in ranking]
         parejas = []
-        jugadores_sin_asignar = []
-        num_mesas = len(jugadores_ordenados) // 4
-
-        # Crear parejas para cada mesa completa
-        for mesa in range(num_mesas):
-            indice_base = mesa * 4  # Índice base para esta mesa
+        num_jugadores = len(jugadores_ordenados)
+        
+        # Calcular el número de mesas completas y jugadores restantes
+        num_mesas_completas = num_jugadores // 4
+        jugadores_restantes = num_jugadores % 4
+        
+        # Crear parejas para las mesas completas
+        for mesa in range(num_mesas_completas):
+            indice_base = mesa * 4
             
-            # Verificar si hay suficientes jugadores para esta mesa
-            if indice_base + 3 >= len(jugadores_ordenados):
-                # Agregar los jugadores restantes a la lista de sin asignar
-                jugadores_sin_asignar.extend(jugadores_ordenados[indice_base:])
-                break
-            
-            # Pareja 1: jugadores en posiciones base y base+2 (1º y 3º, 5º y 7º, etc.)
+            # Pareja 1: jugadores en posiciones base y base+2
             pareja1 = ParejaPartida(
                 partida=siguiente_partida,
                 mesa=mesa + 1,
-                jugador1_id=jugadores_ordenados[indice_base],     # 1º, 5º, 9º...
-                jugador2_id=jugadores_ordenados[indice_base + 2], # 3º, 7º, 11º...
+                jugador1_id=jugadores_ordenados[indice_base],
+                jugador2_id=jugadores_ordenados[indice_base + 2],
                 numero_pareja=1,
                 campeonato_id=campeonato_id
             )
             
-            # Pareja 2: jugadores en posiciones base+1 y base+3 (2º y 4º, 6º y 8º, etc.)
+            # Pareja 2: jugadores en posiciones base+1 y base+3
             pareja2 = ParejaPartida(
                 partida=siguiente_partida,
                 mesa=mesa + 1,
-                jugador1_id=jugadores_ordenados[indice_base + 1], # 2º, 6º, 10º...
-                jugador2_id=jugadores_ordenados[indice_base + 3], # 4º, 8º, 12º...
+                jugador1_id=jugadores_ordenados[indice_base + 1],
+                jugador2_id=jugadores_ordenados[indice_base + 3],
                 numero_pareja=2,
                 campeonato_id=campeonato_id
             )
@@ -197,19 +215,76 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
             db.add(pareja2)
             parejas.extend([pareja1, pareja2])
 
-        # Agregar los jugadores restantes a la lista de sin asignar
-        if len(jugadores_ordenados) % 4 != 0:
-            ultimo_indice = (len(jugadores_ordenados) // 4) * 4
-            jugadores_sin_asignar.extend(jugadores_ordenados[ultimo_indice:])
+        # Manejar los jugadores restantes en la última mesa
+        if jugadores_restantes > 0:
+            ultima_mesa = num_mesas_completas + 1
+            indice_inicio = num_mesas_completas * 4
+            
+            # Si hay jugadores restantes, crear al menos una pareja
+            if jugadores_restantes >= 1:
+                # Si hay al menos 2 jugadores, crear una pareja completa
+                if jugadores_restantes >= 2:
+                    pareja_ultima = ParejaPartida(
+                        partida=siguiente_partida,
+                        mesa=ultima_mesa,
+                        jugador1_id=jugadores_ordenados[indice_inicio],
+                        jugador2_id=jugadores_ordenados[indice_inicio + 1],
+                        numero_pareja=1,
+                        campeonato_id=campeonato_id
+                    )
+                    db.add(pareja_ultima)
+                    parejas.append(pareja_ultima)
+                    
+                    # Si hay 3 o 4 jugadores, crear la segunda pareja
+                    if jugadores_restantes >= 3:
+                        # Para 3 jugadores, crear una pareja con un solo jugador
+                        if jugadores_restantes == 3:
+                            pareja_ultima2 = ParejaPartida(
+                                partida=siguiente_partida,
+                                mesa=ultima_mesa,
+                                jugador1_id=jugadores_ordenados[indice_inicio + 2],
+                                jugador2_id=None,  # Pareja incompleta
+                                numero_pareja=2,
+                                campeonato_id=campeonato_id
+                            )
+                        # Para 4 jugadores, crear una pareja completa
+                        else:
+                            pareja_ultima2 = ParejaPartida(
+                                partida=siguiente_partida,
+                                mesa=ultima_mesa,
+                                jugador1_id=jugadores_ordenados[indice_inicio + 2],
+                                jugador2_id=jugadores_ordenados[indice_inicio + 3],
+                                numero_pareja=2,
+                                campeonato_id=campeonato_id
+                            )
+                        db.add(pareja_ultima2)
+                        parejas.append(pareja_ultima2)
+                # Si solo hay 1 jugador, crear una pareja incompleta
+                else:
+                    pareja_ultima = ParejaPartida(
+                        partida=siguiente_partida,
+                        mesa=ultima_mesa,
+                        jugador1_id=jugadores_ordenados[indice_inicio],
+                        jugador2_id=None,  # Pareja incompleta
+                        numero_pareja=1,
+                        campeonato_id=campeonato_id
+                    )
+                    db.add(pareja_ultima)
+                    parejas.append(pareja_ultima)
 
         db.commit()
+
+        # Calcular el número total de mesas formadas
+        total_mesas = num_mesas_completas + (1 if jugadores_restantes > 0 else 0)
         
-        # Devolver tanto las parejas formadas como los jugadores sin asignar
-        return {
-            "parejas": parejas,
-            "jugadores_sin_asignar": jugadores_sin_asignar,
-            "mesas_formadas": len(parejas) // 2
-        }
+        # No hay jugadores sin asignar ya que todos se asignan a mesas
+        jugadores_sin_asignar = []
+        
+        return SiguientePartidaResponse(
+            parejas=parejas,
+            jugadores_sin_asignar=jugadores_sin_asignar,
+            mesas_formadas=total_mesas
+        )
 
     except Exception as e:
         db.rollback()
@@ -345,29 +420,77 @@ def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
 
 @router.post("/partidas/cerrar/{campeonato_id}/{partida}")
 async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
-    """Cierra una partida y actualiza la partida actual del campeonato"""
-    # Verificar que el campeonato existe
-    campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
-    if not campeonato:
-        raise HTTPException(status_code=404, detail="Campeonato no encontrado")
-    
-    # Verificar que la partida actual coincide
-    if campeonato.partida_actual != partida:
-        raise HTTPException(status_code=400, detail="La partida no coincide con la partida actual del campeonato")
-    
-    # Actualizar la partida actual del campeonato
-    nueva_partida = partida + 1
-    if nueva_partida <= campeonato.numero_partidas:
-        campeonato.partida_actual = nueva_partida
-    else:
-        campeonato.finalizado = True
-    
+    """Cierra una partida y actualiza la partida actual del campeonato."""
     try:
+        # Verificar que el campeonato existe
+        campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+        if not campeonato:
+            raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+
+        # Verificar que existen parejas para esta partida
+        parejas = db.query(ParejaPartida).filter(
+            ParejaPartida.campeonato_id == campeonato_id,
+            ParejaPartida.partida == partida
+        ).all()
+        
+        if not parejas:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se encontraron parejas para la partida {partida}"
+            )
+
+        # Obtener todos los jugadores que participaron en esta partida
+        jugadores_participantes = set()
+        for pareja in parejas:
+            jugadores_participantes.add(pareja.jugador1_id)
+            jugadores_participantes.add(pareja.jugador2_id)
+
+        # Verificar si hay resultados para todos los jugadores de esta partida
+        resultados = db.query(Resultado).filter(
+            Resultado.campeonato_id == campeonato_id,
+            Resultado.partida == partida,
+            Resultado.jugador_id.in_(list(jugadores_participantes))
+        ).all()
+        
+        jugadores_con_resultado = {r.jugador_id for r in resultados}
+        jugadores_sin_resultado = jugadores_participantes - jugadores_con_resultado
+        
+        if jugadores_sin_resultado:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Faltan resultados para los siguientes jugadores: {list(jugadores_sin_resultado)}"
+            )
+        
+        # Obtener la última partida registrada
+        ultima_partida = db.query(func.max(ParejaPartida.partida)).filter(
+            ParejaPartida.campeonato_id == campeonato_id
+        ).scalar() or 0
+
+        # Actualizar la partida actual del campeonato
+        nueva_partida = max(partida + 1, ultima_partida + 1)
+        campeonato.partida_actual = nueva_partida
+            
+        # Verificar si esta es la última partida
+        if campeonato.partida_actual > campeonato.numero_partidas:
+            campeonato.finalizado = True
+        
         db.commit()
-        return {"message": "Partida cerrada exitosamente", "nueva_partida": nueva_partida}
+        return {
+            "message": "Partida cerrada exitosamente",
+            "nueva_partida": campeonato.partida_actual,
+            "campeonato_finalizado": campeonato.finalizado
+        }
+            
+    except HTTPException as he:
+        db.rollback()
+        raise he
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error al cerrar partida: {str(e)}")  # Añadir log del error
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al cerrar la partida: {str(e)}"
+        )
 
 @router.post("/corregir-asignacion/{campeonato_id}/{partida}", response_model=List[ParejaPartidaSchema])
 def corregir_asignacion_parejas(campeonato_id: int, partida: int, db: Session = Depends(get_db)):

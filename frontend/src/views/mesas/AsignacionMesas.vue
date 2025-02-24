@@ -81,31 +81,28 @@ const jugadoresOrdenados = computed(() => {
   const jugadoresMap = new Map()
 
   parejas.value.forEach(pareja => {
-    // Solo procesar parejas válidas
-    if (pareja.jugador1 && pareja.jugador2 && pareja.mesa && pareja.numero_pareja) {
-      // Jugador 1
-      if (!jugadoresMap.has(pareja.jugador1_id)) {
-        jugadoresMap.set(pareja.jugador1_id, {
-          id: pareja.jugador1_id,
-          nombre: pareja.jugador1.nombre || '',
-          apellidos: pareja.jugador1.apellidos || '',
-          club: pareja.jugador1.club || '',
-          mesa: pareja.mesa,
-          numero_pareja: pareja.numero_pareja
-        })
-      }
-      
-      // Jugador 2
-      if (!jugadoresMap.has(pareja.jugador2_id)) {
-        jugadoresMap.set(pareja.jugador2_id, {
-          id: pareja.jugador2_id,
-          nombre: pareja.jugador2.nombre || '',
-          apellidos: pareja.jugador2.apellidos || '',
-          club: pareja.jugador2.club || '',
-          mesa: pareja.mesa,
-          numero_pareja: pareja.numero_pareja
-        })
-      }
+    // Procesar jugador1 siempre que exista
+    if (pareja.jugador1) {
+      jugadoresMap.set(pareja.jugador1_id, {
+        id: pareja.jugador1_id,
+        nombre: pareja.jugador1.nombre || '',
+        apellidos: pareja.jugador1.apellidos || '',
+        club: pareja.jugador1.club || '',
+        mesa: pareja.mesa,
+        numero_pareja: pareja.numero_pareja
+      })
+    }
+    
+    // Procesar jugador2 siempre que exista
+    if (pareja.jugador2) {
+      jugadoresMap.set(pareja.jugador2_id, {
+        id: pareja.jugador2_id,
+        nombre: pareja.jugador2.nombre || '',
+        apellidos: pareja.jugador2.apellidos || '',
+        club: pareja.jugador2.club || '',
+        mesa: pareja.mesa,
+        numero_pareja: pareja.numero_pareja
+      })
     }
   })
 
@@ -151,28 +148,45 @@ const cargarParejas = async () => {
       return
     }
 
-    const partida = campeonatoSeleccionado.value.partida_actual || 0
-    if (typeof partida !== 'number') {
-      console.error('La partida actual no es válida:', partida)
+    // Primero, obtener la última partida con registros
+    const ultimaPartidaResponse = await fetch(`http://localhost:8000/api/parejas-partida/ultima-partida/${campeonatoId}`)
+    if (!ultimaPartidaResponse.ok) {
+      console.error('Error al obtener la última partida')
       return
     }
-
-    partidaActual.value = partida
-
-    // Si no hay sorteo inicial (partida = 0), no intentamos cargar parejas
-    if (partida === 0) {
+    const { ultima_partida, tiene_registros } = await ultimaPartidaResponse.json()
+    
+    // Si no hay registros, establecer partida_actual a 0
+    if (!tiene_registros) {
+      partidaActual.value = 0
       parejas.value = []
+      // Actualizar el localStorage
+      if (campeonatoSeleccionado.value) {
+        campeonatoSeleccionado.value.partida_actual = 0
+        localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonatoSeleccionado.value))
+      }
       return
     }
 
+    // Actualizar la partida actual con la última partida válida
+    partidaActual.value = ultima_partida
+    console.log('Cargando parejas para partida:', partidaActual.value)
+    
+    // Actualizar el localStorage con la partida actual correcta
+    if (campeonatoSeleccionado.value) {
+      campeonatoSeleccionado.value.partida_actual = partidaActual.value
+      localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonatoSeleccionado.value))
+    }
+    
     // Obtener las parejas de la partida actual
-    const parejasResponse = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partida}`)
+    const parejasResponse = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
     if (!parejasResponse.ok) {
       console.error('Error al cargar las parejas:', parejasResponse.statusText)
       parejas.value = []
       return
     }
     const parejasData = await parejasResponse.json()
+    console.log('Parejas cargadas:', parejasData)
 
     // Asignar los puntos iniciales a cada jugador
     parejas.value = parejasData.map(pareja => ({
@@ -182,11 +196,11 @@ const cargarParejas = async () => {
         PG: pareja.jugador1?.PP || 150,
         PC: pareja.jugador1?.PC || 0
       },
-      jugador2: {
+      jugador2: pareja.jugador2 ? {
         ...pareja.jugador2,
         PG: pareja.jugador2?.PP || 150,
         PC: pareja.jugador2?.PC || 0
-      }
+      } : null
     }))
 
     if (jugadoresOrdenados.value.length > jugadoresPorPagina) {
@@ -198,11 +212,11 @@ const cargarParejas = async () => {
   }
 }
 
-// Agregar un watcher para recargar cuando cambie la partida actual
-watch(() => campeonatoSeleccionado.value?.partida_actual, (newPartida) => {
-  if (newPartida) {
-    partidaActual.value = newPartida
-    cargarParejas()
+// Agregar un watcher para el campeonatoSeleccionado
+watch(() => campeonatoSeleccionado.value?.partida_actual, async (newPartida, oldPartida) => {
+  if (newPartida !== oldPartida) {
+    console.log('Partida actual cambió:', newPartida)
+    await cargarParejas()
   }
 })
 
@@ -215,18 +229,27 @@ onMounted(() => {
   
   // Agregar listener para cambios en el localStorage
   window.addEventListener('storage', () => {
+    console.log('Storage changed, reloading data...')
     checkCampeonatoSeleccionado()
+    cargarParejas()
+  })
+
+  // Agregar listener para evento personalizado de actualización
+  window.addEventListener('update-asignacion-mesas', () => {
+    console.log('Received update-asignacion-mesas event')
     cargarParejas()
   })
 })
 
 onUnmounted(() => {
-  // Limpiar el intervalo y el listener cuando el componente se desmonte
   if (intervaloAutomatico) {
     clearInterval(intervaloAutomatico)
   }
   window.removeEventListener('storage', () => {
     checkCampeonatoSeleccionado()
+    cargarParejas()
+  })
+  window.removeEventListener('update-asignacion-mesas', () => {
     cargarParejas()
   })
 })
@@ -252,12 +275,9 @@ const mesasAplanadas = computed(() => {
     }
   })
 
-  // Convertir el Map a array y filtrar mesas completas
-  const mesasCompletas = Array.from(mesasMap.values())
-    .filter(mesa => mesa.pareja1 && mesa.pareja2)
-
-  // Ordenar las mesas por número
-  return mesasCompletas.sort((a, b) => parseInt(a.numero) - parseInt(b.numero))
+  // Convertir el Map a array y mantener todas las mesas, incluso las incompletas
+  return Array.from(mesasMap.values())
+    .sort((a, b) => parseInt(a.numero) - parseInt(b.numero))
 })
 
 // Computed para tener las mesas organizadas por páginas
@@ -272,61 +292,6 @@ const mesasPorPagina = computed(() => {
   }
   return paginas
 })
-
-const cargarMesas = async () => {
-  try {
-    checkCampeonatoSeleccionado()
-    if (!campeonatoSeleccionado.value) {
-      console.error('No hay campeonato seleccionado')
-      return
-    }
-
-    const partida = campeonatoSeleccionado.value.partida_actual || 0
-    if (typeof partida !== 'number') {
-      console.error('La partida actual no es válida:', partida)
-      return
-    }
-
-    partidaActual.value = partida
-
-    // Si no hay sorteo inicial (partida = 0), no intentamos cargar parejas
-    if (partida === 0) {
-      parejas.value = []
-      return
-    }
-
-    // Obtener las parejas de la partida actual
-    const parejasResponse = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partida}`)
-    if (!parejasResponse.ok) {
-      console.error('Error al cargar las parejas:', parejasResponse.statusText)
-      parejas.value = []
-      return
-    }
-    const parejasData = await parejasResponse.json()
-
-    // Asignar los puntos iniciales a cada jugador
-    parejas.value = parejasData.map(pareja => ({
-      ...pareja,
-      jugador1: {
-        ...pareja.jugador1,
-        PG: pareja.jugador1?.PP || 150,
-        PC: pareja.jugador1?.PC || 0
-      },
-      jugador2: {
-        ...pareja.jugador2,
-        PG: pareja.jugador2?.PP || 150,
-        PC: pareja.jugador2?.PC || 0
-      }
-    }))
-
-    if (jugadoresOrdenados.value.length > jugadoresPorPagina) {
-      iniciarPaginacionAutomatica()
-    }
-  } catch (error) {
-    console.error('Error al cargar los datos:', error)
-    parejas.value = []
-  }
-}
 </script>
 
 <style scoped>
