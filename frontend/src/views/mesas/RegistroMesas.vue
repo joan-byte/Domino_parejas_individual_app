@@ -367,8 +367,8 @@ const cerrarPartida = async () => {
         vistaSecundaria.value = 'mesas'
       }
       
-      // Redirigir la ventana principal
-      router.push(`/mesas/asignacion/${campeonatoId}`)
+      // Recargar los datos en la ventana principal sin navegar
+      await cargarMesas()
 
     } catch (error) {
       console.error('Error al crear nuevas parejas:', error)

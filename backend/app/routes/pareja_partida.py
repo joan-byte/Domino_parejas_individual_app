@@ -442,8 +442,10 @@ async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends
         # Obtener todos los jugadores que participaron en esta partida
         jugadores_participantes = set()
         for pareja in parejas:
-            jugadores_participantes.add(pareja.jugador1_id)
-            jugadores_participantes.add(pareja.jugador2_id)
+            if pareja.jugador1_id:  # Agregar jugador1 si existe
+                jugadores_participantes.add(pareja.jugador1_id)
+            if pareja.jugador2_id:  # Agregar jugador2 solo si existe
+                jugadores_participantes.add(pareja.jugador2_id)
 
         # Verificar si hay resultados para todos los jugadores de esta partida
         resultados = db.query(Resultado).filter(

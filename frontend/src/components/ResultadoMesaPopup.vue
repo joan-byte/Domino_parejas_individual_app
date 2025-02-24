@@ -323,9 +323,13 @@ const guardarResultados = async () => {
     // Validar que todos los campos requeridos estén presentes y sean números
     const camposRequeridos = [
       'campeonato_id', 'partida', 'mesa', 
-      'jugador1_id', 'jugador2_id',
-      'puntos_pareja1', 'mesas_ganadas_pareja1'
+      'jugador1_id'
     ]
+
+    // Si no es una mesa incompleta, agregar los campos adicionales requeridos
+    if (!esUltimaMesaIncompleta.value) {
+      camposRequeridos.push('jugador2_id', 'puntos_pareja1', 'mesas_ganadas_pareja1')
+    }
 
     const camposFaltantes = camposRequeridos.filter(campo => {
       const valor = datos[campo]
@@ -414,7 +418,7 @@ watch(() => props.show, (newVal) => {
     // Si es la última mesa y está incompleta
     if (esUltimaMesaIncompleta.value) {
       // Asignar la mitad del PM como PT para la pareja que tiene jugadores
-      const ptAutomatico = Math.floor(campeonatoPM.value / 2)
+      const ptAutomatico = Math.ceil(campeonatoPM.value / 2)  // Redondeo hacia arriba
       
       // Asignar puntos a la primera pareja si tiene al menos un jugador
       if (props.mesa.pareja1?.jugador1) {
@@ -434,12 +438,13 @@ watch(() => props.show, (newVal) => {
         puntosPareja2.value.PC = ptAutomatico
       }
       
-      // Deshabilitar la edición de los campos
+      // Deshabilitar la edición de los campos y guardar automáticamente
       setTimeout(() => {
         const inputs = document.querySelectorAll('.pareja-resultados input')
         inputs.forEach(input => {
           input.disabled = true
         })
+        guardarResultados()
       }, 100)
     } else {
       // Cuando se abre el popup normalmente, enfocamos el campo PT de la pareja 1
