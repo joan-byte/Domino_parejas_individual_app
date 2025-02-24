@@ -41,6 +41,7 @@
           <div class="dropdown-content">
             <router-link :to="`/resultados/ranking/${campeonatoSeleccionado.id}`" class="dropdown-item">Ranking</router-link>
             <router-link :to="`/resultados/podium/${campeonatoSeleccionado.id}`" class="dropdown-item">Podium</router-link>
+            <router-link :to="`/resultados/ranking/imprimir/${campeonatoSeleccionado.id}`" class="dropdown-item">Imprimir Ranking</router-link>
           </div>
         </div>
       </div>

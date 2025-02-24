@@ -8,6 +8,7 @@ import RegistroMesas from '../views/mesas/RegistroMesas.vue'
 import ImprimirMesas from '../views/mesas/ImprimirMesas.vue'
 import Ranking from '../views/resultados/Ranking.vue'
 import Podium from '../views/resultados/Podium.vue'
+import ImprimirRanking from '../views/resultados/ImprimirRanking.vue'
 
 const routes = [
   {
@@ -54,6 +55,11 @@ const routes = [
     path: '/resultados/podium/:campeonatoId',
     name: 'podium',
     component: Podium
+  },
+  {
+    path: '/resultados/ranking/imprimir/:campeonatoId',
+    name: 'imprimir-ranking',
+    component: ImprimirRanking
   }
 ]
 
