@@ -61,20 +61,24 @@ const partidaActual = ref(1)
 const rankingData = ref([])
 const campeonatoFinalizado = ref(false)
 
-// Configuración de paginación
-const JUGADORES_POR_PAGINA = 15
+// Configuración de paginación - Ajustado para A4 con márgenes
+const JUGADORES_POR_PAGINA = 25 // Aumentado para aprovechar mejor el espacio
 
 // Texto del estado de la partida
 const estadoPartida = computed(() => {
   return campeonatoFinalizado.value ? 'Clasificación Final' : `Partida: ${partidaActual.value}`
 })
 
-// Dividir los datos en páginas
+// Dividir los datos en páginas de manera óptima
 const paginas = computed(() => {
   const paginas = []
-  for (let i = 0; i < rankingData.value.length; i += JUGADORES_POR_PAGINA) {
-    paginas.push(rankingData.value.slice(i, i + JUGADORES_POR_PAGINA))
+  const totalJugadores = rankingData.value.length
+  
+  for (let i = 0; i < totalJugadores; i += JUGADORES_POR_PAGINA) {
+    const paginaActual = rankingData.value.slice(i, Math.min(i + JUGADORES_POR_PAGINA, totalJugadores))
+    paginas.push(paginaActual)
   }
+  
   return paginas
 })
 
@@ -183,40 +187,93 @@ onMounted(() => {
 /* Estilos específicos para impresión */
 @media print {
   @page {
-    size: A4;
-    margin: 1cm;
+    size: A4 portrait;
+    margin: 2cm 1.5cm; /* Márgenes uniformes */
   }
 
   body {
     background: white;
+    margin: 0;
+    padding: 0;
   }
 
   .print-only {
     position: static;
-    width: auto;
+    width: 100%;
     transform: none;
     padding: 0;
+    margin: 0;
   }
 
   .ranking-page {
     page-break-after: always;
     border: none;
     padding: 0;
+    margin: 0;
+    height: calc(100vh - 4cm); /* Altura total menos márgenes */
+    display: flex;
+    flex-direction: column;
   }
 
   .ranking-page:last-child {
     page-break-after: avoid;
   }
 
-  .ranking-table th,
-  .ranking-table td {
-    border: 1px solid #000;
+  .header {
+    margin-bottom: 1cm;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .ranking-table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+    flex: 1;
+  }
+
+  .ranking-table thead {
+    display: table-header-group; /* Repetir encabezados en cada página */
   }
 
   .ranking-table th {
     background-color: #f0f0f0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    padding: 0.3cm;
+    font-weight: bold;
+    border: 1px solid #000;
+  }
+
+  .ranking-table td {
+    padding: 0.2cm;
+    border: 1px solid #000;
+  }
+
+  .footer {
+    margin-top: 1cm;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  /* Ajustar tamaños de texto para impresión */
+  .header h2 {
+    font-size: 18pt;
+    margin: 0 0 0.5cm 0;
+  }
+
+  .tournament-info p {
+    font-size: 14pt;
+    margin: 0.2cm 0;
+  }
+
+  .ranking-table th,
+  .ranking-table td {
+    font-size: 11pt;
+  }
+
+  .footer p {
+    font-size: 10pt;
   }
 }
 </style> 

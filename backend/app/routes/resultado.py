@@ -129,7 +129,7 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
             PV=PV_pareja1,
             PC=PC_pareja1,
             PG=PG_pareja1,
-            MG=datos.mesas_ganadas_pareja1,
+            MG=datos.manos_ganadas_pareja1,
             campeonato_id=datos.campeonato_id
         )
         db.add(resultado)
@@ -146,7 +146,7 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
                 PV=PV_pareja1,
                 PC=PC_pareja1,
                 PG=PG_pareja1,
-                MG=datos.mesas_ganadas_pareja1,
+                MG=datos.manos_ganadas_pareja1,
                 campeonato_id=datos.campeonato_id
             )
             db.add(resultado)
@@ -169,7 +169,7 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
                 PV=PV_pareja2,
                 PC=PC_pareja2,
                 PG=PG_pareja2,
-                MG=datos.mesas_ganadas_pareja2 or 0,
+                MG=datos.manos_ganadas_pareja2 or 0,
                 campeonato_id=datos.campeonato_id
             )
             db.add(resultado)
@@ -186,7 +186,7 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
                     PV=PV_pareja2,
                     PC=PC_pareja2,
                     PG=PG_pareja2,
-                    MG=datos.mesas_ganadas_pareja2 or 0,
+                    MG=datos.manos_ganadas_pareja2 or 0,
                     campeonato_id=datos.campeonato_id
                 )
                 db.add(resultado)
@@ -300,14 +300,14 @@ def update_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
             resultado.PV = PV_pareja1
             resultado.PC = PC_pareja1
             resultado.PG = PG_pareja1
-            resultado.MG = datos.mesas_ganadas_pareja1
+            resultado.MG = datos.manos_ganadas_pareja1
             resultado.pareja = 1  # Asegurar que el número de pareja es correcto
         else:  # Pareja 2
             resultado.PT = datos.puntos_pareja2
             resultado.PV = PV_pareja2
             resultado.PC = PC_pareja2
             resultado.PG = PG_pareja2
-            resultado.MG = datos.mesas_ganadas_pareja2
+            resultado.MG = datos.manos_ganadas_pareja2
             resultado.pareja = 2  # Asegurar que el número de pareja es correcto
     
     db.commit()

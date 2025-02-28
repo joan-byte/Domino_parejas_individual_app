@@ -28,7 +28,7 @@
             <div class="dropdown-menu" aria-labelledby="navbarDropdownMesas">
               <router-link :to="`/mesas/asignacion/${campeonatoSeleccionado.id}`" class="dropdown-item">Asignación</router-link>
               <router-link :to="`/mesas/registro/${campeonatoSeleccionado.id}`" class="dropdown-item">Registro</router-link>
-              <router-link :to="`/mesas/imprimir/${campeonatoSeleccionado.id}`" class="dropdown-item">Imprimir</router-link>
+              <router-link :to="`/mesas/imprimir/${campeonatoSeleccionado.id}`" class="dropdown-item">Imprimir Mesas</router-link>
             </div>
           </div>
         </div>
@@ -114,12 +114,38 @@ onMounted(() => {
 
 /* Estilos para impresión */
 @media print {
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   #app {
     padding-top: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    position: relative !important;
+    min-height: auto !important;
+    height: auto !important;
+    width: auto !important;
+    overflow: visible !important;
   }
 
   .navbar {
     display: none !important;
+  }
+
+  /* Asegurar que no hay márgenes ni padding que interfieran */
+  .print-only * {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 

@@ -320,7 +320,7 @@ def get_parejas_mesa(campeonato_id: int, partida: int, mesa: int, db: Session = 
     ).order_by(ParejaPartida.numero_pareja).all()
     return parejas
 
-@router.delete("/parejas-partida/eliminar/{campeonato_id}/{partida}")
+@router.delete("/eliminar/{campeonato_id}/{partida}")
 def eliminar_parejas_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
     """Elimina todas las parejas de una partida específica"""
     parejas = db.query(ParejaPartida).filter(

@@ -37,11 +37,6 @@
       </div>
     </div>
 
-    <ImpresionMesas 
-      :mesas-por-pagina="mesasPorPagina"
-      :partida-actual="partidaActual"
-    />
-
     <div v-if="jugadoresPaginados.length === 0" class="no-print">
       <p>No hay jugadores asignados todavía.</p>
     </div>
@@ -50,12 +45,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import ImpresionMesas from '@/components/ImpresionMesas.vue'
 
 const route = useRoute()
-const campeonatoId = route.params.campeonatoId
+const router = useRouter()
+const campeonatoId = ref(route.params.campeonatoId)
 const parejas = ref([])
 const paginaActual = ref(0)
 const jugadoresPorPagina = 15
@@ -63,12 +58,101 @@ const campeonatoSeleccionado = ref(null)
 const partidaActual = ref(0)
 let intervaloAutomatico = null
 
+// Verificar y obtener el campeonato seleccionado
 const checkCampeonatoSeleccionado = () => {
+  console.log('Verificando campeonato seleccionado...')
+  
+  // Si tenemos un ID en la ruta, usarlo primero
+  if (route.params.campeonatoId) {
+    campeonatoId.value = route.params.campeonatoId
+    console.log('ID de campeonato desde la ruta:', campeonatoId.value)
+  } else {
+    console.log('No hay ID de campeonato en la ruta')
+  }
+  
+  // Verificar si hay un campeonato en localStorage
   const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
   if (campeonatoGuardado) {
-    campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
-    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 0
+    try {
+      const campeonatoData = JSON.parse(campeonatoGuardado)
+      console.log('Campeonato encontrado en localStorage:', campeonatoData)
+      
+      // Si no tenemos ID en la ruta, usar el del localStorage
+      if (!campeonatoId.value && campeonatoData.id) {
+        campeonatoId.value = campeonatoData.id.toString()
+        console.log('Usando ID de campeonato desde localStorage:', campeonatoId.value)
+      }
+      
+      // Actualizar el campeonato seleccionado
+      campeonatoSeleccionado.value = campeonatoData
+      
+      // Actualizar la partida actual
+      if (campeonatoData.partida_actual !== undefined) {
+        partidaActual.value = campeonatoData.partida_actual
+        console.log('Partida actual desde localStorage:', partidaActual.value)
+      }
+    } catch (error) {
+      console.error('Error al parsear el campeonato guardado:', error)
+    }
+  } else {
+    console.warn('No hay campeonato guardado en localStorage')
   }
+  
+  // Si después de todo no tenemos un ID, intentar obtener el campeonato activo
+  if (!campeonatoId.value) {
+    console.log('Intentando obtener campeonato activo...')
+    // Intentar obtener el último campeonato activo
+    fetch('http://localhost:8000/api/campeonatos')
+      .then(response => response.json())
+      .then(data => {
+        if (data && data.length > 0) {
+          // Buscar un campeonato activo
+          const campeonatoActivo = data.find(c => c.activo && !c.finalizado)
+          if (campeonatoActivo) {
+            console.log('Campeonato activo encontrado:', campeonatoActivo)
+            campeonatoId.value = campeonatoActivo.id.toString()
+            campeonatoSeleccionado.value = campeonatoActivo
+            partidaActual.value = campeonatoActivo.partida_actual
+            localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonatoActivo))
+            cargarParejas() // Recargar los datos con el nuevo campeonato
+            return true
+          } else {
+            // Si no hay activo, usar el primero
+            console.log('No hay campeonato activo, usando el primero:', data[0])
+            campeonatoId.value = data[0].id.toString()
+            campeonatoSeleccionado.value = data[0]
+            partidaActual.value = data[0].partida_actual
+            localStorage.setItem('campeonatoSeleccionado', JSON.stringify(data[0]))
+            cargarParejas() // Recargar los datos con el nuevo campeonato
+            return true
+          }
+        } else {
+          console.error('No se encontraron campeonatos')
+          router.push('/campeonatos')
+          return false
+        }
+      })
+      .catch(error => {
+        console.error('Error al obtener campeonatos:', error)
+        router.push('/campeonatos')
+        return false
+      })
+  } else if (!campeonatoSeleccionado.value) {
+    // Si tenemos ID pero no tenemos información del campeonato, intentar obtenerla
+    console.log('Tenemos ID pero no información del campeonato, intentando obtenerla...')
+    obtenerInfoCampeonato()
+      .then(resultado => {
+        if (resultado) {
+          cargarParejas() // Recargar los datos con la información actualizada
+        }
+        return resultado
+      })
+      .catch(() => {
+        return false
+      })
+  }
+  
+  return !!campeonatoId.value
 }
 
 // Procesar los jugadores y sus mesas asignadas
@@ -140,53 +224,73 @@ const iniciarPaginacionAutomatica = () => {
   }, 10000) // 10 segundos
 }
 
+// Obtener información actualizada del campeonato
+const obtenerInfoCampeonato = async () => {
+  if (!campeonatoId.value) {
+    console.error('No hay ID de campeonato para obtener información')
+    return false
+  }
+  
+  try {
+    console.log('Obteniendo información actualizada del campeonato:', campeonatoId.value)
+    const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId.value}`)
+    
+    if (!response.ok) {
+      throw new Error(`Error al obtener campeonato: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    console.log('Información del campeonato obtenida:', data)
+    
+    // Actualizar la información del campeonato
+    campeonatoSeleccionado.value = data
+    partidaActual.value = data.partida_actual
+    
+    // Actualizar en localStorage
+    localStorage.setItem('campeonatoSeleccionado', JSON.stringify(data))
+    
+    return true
+  } catch (error) {
+    console.error('Error al obtener información del campeonato:', error)
+    return false
+  }
+}
+
 const cargarParejas = async () => {
   try {
-    checkCampeonatoSeleccionado()
-    if (!campeonatoSeleccionado.value) {
-      console.error('No hay campeonato seleccionado')
+    // Verificar que tenemos un campeonato seleccionado
+    if (!checkCampeonatoSeleccionado()) {
       return
     }
-
-    // Primero, obtener la última partida con registros
-    const ultimaPartidaResponse = await fetch(`http://localhost:8000/api/parejas-partida/ultima-partida/${campeonatoId}`)
-    if (!ultimaPartidaResponse.ok) {
-      console.error('Error al obtener la última partida')
-      return
-    }
-    const { ultima_partida, tiene_registros } = await ultimaPartidaResponse.json()
     
-    // Si no hay registros, establecer partida_actual a 0
-    if (!tiene_registros) {
-      partidaActual.value = 0
+    // Obtener información actualizada del campeonato
+    await obtenerInfoCampeonato()
+    
+    // Si después de todo no tenemos un ID o partida actual, salir
+    if (!campeonatoId.value) {
+      console.error('No hay ID de campeonato para cargar parejas')
+      return
+    }
+    
+    console.log('Cargando parejas para campeonato:', campeonatoId.value, 'partida:', partidaActual.value)
+    
+    // Si la partida actual es 0, no hay nada que cargar
+    if (partidaActual.value === 0) {
+      console.log('La partida actual es 0, no hay parejas para cargar')
       parejas.value = []
-      // Actualizar el localStorage
-      if (campeonatoSeleccionado.value) {
-        campeonatoSeleccionado.value.partida_actual = 0
-        localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonatoSeleccionado.value))
-      }
       return
-    }
-
-    // Actualizar la partida actual con la última partida válida
-    partidaActual.value = ultima_partida
-    console.log('Cargando parejas para partida:', partidaActual.value)
-    
-    // Actualizar el localStorage con la partida actual correcta
-    if (campeonatoSeleccionado.value) {
-      campeonatoSeleccionado.value.partida_actual = partidaActual.value
-      localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonatoSeleccionado.value))
     }
     
     // Obtener las parejas de la partida actual
-    const parejasResponse = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    const parejasResponse = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId.value}/partida/${partidaActual.value}`)
     if (!parejasResponse.ok) {
       console.error('Error al cargar las parejas:', parejasResponse.statusText)
       parejas.value = []
       return
     }
+    
     const parejasData = await parejasResponse.json()
-    console.log('Parejas cargadas:', parejasData)
+    console.log('Parejas cargadas:', parejasData.length)
 
     // Asignar los puntos iniciales a cada jugador
     parejas.value = parejasData.map(pareja => ({
@@ -216,28 +320,42 @@ const cargarParejas = async () => {
 watch(() => campeonatoSeleccionado.value?.partida_actual, async (newPartida, oldPartida) => {
   if (newPartida !== oldPartida) {
     console.log('Partida actual cambió:', newPartida)
+    partidaActual.value = newPartida
     await cargarParejas()
   }
 })
 
-onMounted(() => {
-  checkCampeonatoSeleccionado()
-  if (campeonatoSeleccionado.value) {
-    partidaActual.value = campeonatoSeleccionado.value.partida_actual || 0
+// Agregar un watcher para el ID del campeonato
+watch(() => campeonatoId.value, async (newId, oldId) => {
+  if (newId !== oldId) {
+    console.log('ID del campeonato cambió:', newId)
+    await cargarParejas()
   }
-  cargarParejas()
+})
+
+onMounted(async () => {
+  console.log('Componente AsignacionMesas montado')
+  
+  // Verificar y cargar el campeonato seleccionado
+  if (checkCampeonatoSeleccionado()) {
+    // Obtener información actualizada del campeonato
+    await obtenerInfoCampeonato()
+    // Cargar las parejas
+    await cargarParejas()
+  }
   
   // Agregar listener para cambios en el localStorage
-  window.addEventListener('storage', () => {
+  window.addEventListener('storage', async () => {
     console.log('Storage changed, reloading data...')
-    checkCampeonatoSeleccionado()
-    cargarParejas()
+    if (checkCampeonatoSeleccionado()) {
+      await cargarParejas()
+    }
   })
 
   // Agregar listener para evento personalizado de actualización
-  window.addEventListener('update-asignacion-mesas', () => {
+  window.addEventListener('update-asignacion-mesas', async () => {
     console.log('Received update-asignacion-mesas event')
-    cargarParejas()
+    await cargarParejas()
   })
 })
 
@@ -245,13 +363,8 @@ onUnmounted(() => {
   if (intervaloAutomatico) {
     clearInterval(intervaloAutomatico)
   }
-  window.removeEventListener('storage', () => {
-    checkCampeonatoSeleccionado()
-    cargarParejas()
-  })
-  window.removeEventListener('update-asignacion-mesas', () => {
-    cargarParejas()
-  })
+  window.removeEventListener('storage', () => {})
+  window.removeEventListener('update-asignacion-mesas', () => {})
 })
 
 // Computed para tener un array plano de mesas
@@ -364,5 +477,20 @@ const mesasPorPagina = computed(() => {
   .no-print {
     display: none !important;
   }
+}
+
+.btn-imprimir {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s;
+}
+
+.btn-imprimir:hover {
+  background-color: #45a049;
 }
 </style> 

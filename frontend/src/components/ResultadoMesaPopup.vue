@@ -226,7 +226,9 @@ watch(() => props.campeonatoId, obtenerPM, { immediate: true })
 watch(() => props.resultadoExistente, (newVal) => {
   if (newVal) {
     puntosPareja1.value.PT = newVal.puntos_pareja1
+    puntosPareja1.value.MG = newVal.manos_ganadas_pareja1
     puntosPareja2.value.PT = newVal.puntos_pareja2
+    puntosPareja2.value.MG = newVal.manos_ganadas_pareja2
     calcularPuntos(1)
     calcularPuntos(2)
   }
@@ -287,12 +289,47 @@ const guardarResultados = async () => {
   }
 
   try {
-    // Log de los props recibidos
-    console.log('Props recibidos:', {
+    // Log detallado de los props y el estado
+    console.log('=== INICIO DE LOGS DETALLADOS ===')
+    console.log('Props completos:', {
+      show: props.show,
+      mesa: props.mesa,
       campeonatoId: props.campeonatoId,
       partidaActual: props.partidaActual,
-      mesa: props.mesa?.numeroMesa
+      resultadoExistente: props.resultadoExistente,
+      esUltimaMesa: props.esUltimaMesa
     })
+    
+    console.log('Estado de puntos:', {
+      puntosPareja1: puntosPareja1.value,
+      puntosPareja2: puntosPareja2.value,
+      campeonatoPM: campeonatoPM.value
+    })
+
+    // Verificar si es una mesa normal (no última) y tiene todos los jugadores
+    const esMesaNormal = !props.esUltimaMesa
+    const tieneJugadoresCompletos = props.mesa.pareja1?.jugador1_id && 
+                                  props.mesa.pareja1?.jugador2_id && 
+                                  props.mesa.pareja2?.jugador1_id && 
+                                  props.mesa.pareja2?.jugador2_id
+
+    console.log('Validación de mesa:', {
+      esMesaNormal,
+      tieneJugadoresCompletos,
+      esUltimaMesa: props.esUltimaMesa,
+      jugadoresPareja1: {
+        jugador1: props.mesa.pareja1?.jugador1_id,
+        jugador2: props.mesa.pareja1?.jugador2_id
+      },
+      jugadoresPareja2: {
+        jugador1: props.mesa.pareja2?.jugador1_id,
+        jugador2: props.mesa.pareja2?.jugador2_id
+      }
+    })
+
+    if (esMesaNormal && !tieneJugadoresCompletos) {
+      throw new Error('Las mesas que no son la última deben tener 4 jugadores')
+    }
 
     // Asegurarnos de que todos los valores son números enteros
     const datos = {
@@ -301,64 +338,39 @@ const guardarResultados = async () => {
       mesa: parseInt(props.mesa.numeroMesa),
       es_ultima_mesa: props.esUltimaMesa,
       jugador1_id: parseInt(props.mesa.pareja1.jugador1_id),
-      jugador2_id: parseInt(props.mesa.pareja1.jugador2_id),
+      jugador2_id: props.mesa.pareja1?.jugador2_id ? parseInt(props.mesa.pareja1.jugador2_id) : null,
       jugador3_id: props.mesa.pareja2?.jugador1_id ? parseInt(props.mesa.pareja2.jugador1_id) : null,
       jugador4_id: props.mesa.pareja2?.jugador2_id ? parseInt(props.mesa.pareja2.jugador2_id) : null,
       puntos_pareja1: parseInt(puntosPareja1.value.PT) || 0,
       puntos_pareja2: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.PT) || 0 : null,
-      mesas_ganadas_pareja1: parseInt(puntosPareja1.value.MG) || 0,
-      mesas_ganadas_pareja2: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.MG) || 0 : null
+      manos_ganadas_pareja1: parseInt(puntosPareja1.value.MG) || 0,
+      manos_ganadas_pareja2: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.MG) || 0 : null
     }
 
-    // Log de los datos antes de la validación
-    console.log('Datos antes de validación:', {
-      ...datos,
-      props: {
-        campeonatoId: props.campeonatoId,
-        partidaActual: props.partidaActual,
-        mesa: props.mesa
-      }
+    // Log detallado de cada campo
+    console.log('Validación detallada de campos:')
+    Object.entries(datos).forEach(([campo, valor]) => {
+      console.log(`${campo}: ${valor} (${typeof valor})`)
     })
 
-    // Validar que todos los campos requeridos estén presentes y sean números
-    const camposRequeridos = [
-      'campeonato_id', 'partida', 'mesa', 
-      'jugador1_id'
-    ]
-
-    // Si no es una mesa incompleta, agregar los campos adicionales requeridos
-    if (!esUltimaMesaIncompleta.value) {
-      camposRequeridos.push('jugador2_id', 'puntos_pareja1', 'mesas_ganadas_pareja1')
-    }
-
-    const camposFaltantes = camposRequeridos.filter(campo => {
-      const valor = datos[campo]
-      const esInvalido = valor === undefined || valor === null || isNaN(valor)
-      if (esInvalido) {
-        console.log(`Campo inválido ${campo}:`, valor)
-      }
-      return esInvalido
-    })
-
-    if (camposFaltantes.length > 0) {
-      throw new Error(`Campos inválidos o faltantes: ${camposFaltantes.join(', ')}`)
-    }
-
+    // Determinar si es una modificación o un nuevo registro
+    const method = props.resultadoExistente ? 'PUT' : 'POST'
+    console.log(`Usando método ${method} para ${props.resultadoExistente ? 'modificar' : 'crear'} resultados`)
     console.log('Datos a enviar:', JSON.stringify(datos, null, 2))
 
     const response = await fetch('http://localhost:8000/api/resultados/mesa/', {
-      method: 'POST',
+      method: method,
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(datos)
     })
 
-    const responseData = await response.json()
-    
     if (!response.ok) {
+      const responseData = await response.json()
       console.error('Error response status:', response.status)
       console.error('Error response data:', responseData)
+      console.error('Response headers:', Object.fromEntries([...response.headers]))
       
       let mensajeError = 'Error al guardar los resultados'
       if (responseData.detail) {
@@ -372,7 +384,8 @@ const guardarResultados = async () => {
       throw new Error(mensajeError)
     }
 
-    console.log('Resultados guardados correctamente')
+    const responseData = await response.json()
+    console.log('Respuesta del servidor:', responseData)
     
     // Emitir el evento para actualizar el ranking
     rankingBus.emit()

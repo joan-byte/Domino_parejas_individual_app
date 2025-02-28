@@ -10,6 +10,10 @@ from app.models.pareja_partida import ParejaPartida
 from app.models.jugador import Jugador
 from sqlalchemy.sql import text
 from sqlalchemy import and_
+import logging
+
+# Configurar logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/campeonatos",
@@ -19,7 +23,44 @@ router = APIRouter(
 @router.get("/", response_model=List[CampeonatoResponse])
 async def read_campeonatos(db: Session = Depends(get_db)):
     """Obtener lista de todos los campeonatos registrados en el sistema."""
-    return db.query(Campeonato).all()
+    try:
+        # Obtener los campeonatos de la base de datos
+        campeonatos = db.query(Campeonato).all()
+        logger.info(f"Campeonatos encontrados: {len(campeonatos)}")
+        
+        # Verificar si hay campeonatos
+        if not campeonatos:
+            logger.info("No se encontraron campeonatos en la base de datos")
+            return []
+            
+        # Convertir los objetos SQLAlchemy a diccionarios
+        campeonatos_response = []
+        for campeonato in campeonatos:
+            try:
+                campeonato_dict = {
+                    "id": campeonato.id,
+                    "nombre": campeonato.nombre,
+                    "fecha_inicio": campeonato.fecha_inicio,
+                    "dias_duracion": campeonato.dias_duracion,
+                    "numero_partidas": campeonato.numero_partidas,
+                    "PM": campeonato.PM,
+                    "activo": campeonato.activo,
+                    "partida_actual": campeonato.partida_actual,
+                    "finalizado": campeonato.finalizado
+                }
+                campeonatos_response.append(campeonato_dict)
+            except Exception as e:
+                logger.error(f"Error al procesar campeonato {campeonato.id}: {str(e)}")
+                continue
+        
+        return campeonatos_response
+        
+    except Exception as e:
+        logger.error(f"Error al obtener campeonatos: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno del servidor: {str(e)}"
+        )
 
 @router.post("/", response_model=CampeonatoResponse)
 def create_campeonato(campeonato: CampeonatoCreate, db: Session = Depends(get_db)):

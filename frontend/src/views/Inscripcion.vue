@@ -26,13 +26,11 @@
             type="text" 
             id="nombre" 
             ref="nombreInput"
-            v-model="jugador.nombre" 
+            :value="jugador.nombre"
             required 
             class="form-control"
             autocomplete="off"
-            pattern="[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]+"
-            title="Solo letras (incluyendo acentos), espacios y caracteres especiales permitidos"
-            @input="validarCampo($event, 'nombre')"
+            @input="(e) => actualizarCampo(e, 'nombre')"
           >
         </div>
 
@@ -41,13 +39,11 @@
           <input 
             type="text" 
             id="apellidos" 
-            v-model="jugador.apellidos" 
+            :value="jugador.apellidos"
             required 
             class="form-control"
             autocomplete="off"
-            pattern="[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]+"
-            title="Solo letras (incluyendo acentos), espacios y caracteres especiales permitidos"
-            @input="validarCampo($event, 'apellidos')"
+            @input="(e) => actualizarCampo(e, 'apellidos')"
           >
         </div>
 
@@ -56,12 +52,10 @@
           <input 
             type="text" 
             id="club" 
-            v-model="jugador.club" 
+            :value="jugador.club"
             class="form-control"
             autocomplete="off"
-            pattern="[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]+"
-            title="Solo letras (incluyendo acentos), espacios y caracteres especiales permitidos"
-            @input="validarCampo($event, 'club')"
+            @input="(e) => actualizarCampo(e, 'club')"
           >
         </div>
 
@@ -144,7 +138,7 @@ import axios from 'axios'
 
 const route = useRoute()
 const router = useRouter()
-const campeonatoId = route.params.campeonatoId
+const campeonatoId = ref(route.params.campeonatoId || '')
 const jugadores = ref([])
 const nombreInput = ref(null)
 const inscripcionFinalizada = ref(false)
@@ -155,7 +149,7 @@ const jugador = ref({
   nombre: '',
   apellidos: '',
   club: '',
-  campeonato_id: campeonatoId
+  campeonato_id: parseInt(route.params.campeonatoId) || 0
 })
 
 const focusNombreInput = () => {
@@ -165,8 +159,10 @@ const focusNombreInput = () => {
 }
 
 const cargarJugadores = async () => {
+  if (!campeonatoId.value) return
+
   try {
-    const response = await fetch(`http://localhost:8000/api/jugadores/campeonato/${campeonatoId}`)
+    const response = await fetch(`http://localhost:8000/api/jugadores/campeonato/${campeonatoId.value}`)
     if (response.ok) {
       const nuevosJugadores = await response.json()
       // Ordenar jugadores por ID de forma descendente
@@ -229,7 +225,7 @@ const cancelarEdicion = () => {
     nombre: '',
     apellidos: '',
     club: '',
-    campeonato_id: route.params.campeonatoId
+    campeonato_id: parseInt(campeonatoId.value)
   }
   focusNombreInput()
 }
@@ -252,13 +248,20 @@ const eliminarJugador = async () => {
 
 const guardarJugador = async () => {
   try {
+    const jugadorData = {
+      ...jugador.value,
+      nombre: jugador.value.nombre.trim(),
+      apellidos: jugador.value.apellidos.trim(),
+      club: jugador.value.club ? jugador.value.club.trim() : null
+    }
+
     if (jugadorSeleccionado.value) {
       // Actualizar jugador existente
-      await axios.put(`http://localhost:8000/api/jugadores/${jugadorSeleccionado.value.id}`, jugador.value)
+      await axios.put(`http://localhost:8000/api/jugadores/${jugadorSeleccionado.value.id}`, jugadorData)
       alert('Jugador actualizado exitosamente')
     } else {
       // Crear nuevo jugador
-      await axios.post('http://localhost:8000/api/jugadores/', jugador.value)
+      await axios.post('http://localhost:8000/api/jugadores/', jugadorData)
     }
     
     await cargarJugadores()
@@ -276,7 +279,7 @@ const guardarJugador = async () => {
 
 const finalizarInscripcion = async () => {
   // Verificar que hay suficientes jugadores activos (mínimo 4 para formar una mesa)
-  const jugadoresActivos = jugadores.value.filter(j => j.activo && j.campeonato_id === parseInt(campeonatoId))
+  const jugadoresActivos = jugadores.value.filter(j => j.activo && j.campeonato_id === parseInt(campeonatoId.value))
   if (jugadoresActivos.length < 4) {
     alert('Se necesitan al menos 4 jugadores activos para realizar el sorteo')
     return
@@ -290,7 +293,7 @@ const finalizarInscripcion = async () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        campeonato_id: parseInt(campeonatoId),
+        campeonato_id: parseInt(campeonatoId.value),
         jugadores: jugadoresActivos.map(j => j.id)
       })
     })
@@ -306,10 +309,19 @@ const finalizarInscripcion = async () => {
       const campeonato = JSON.parse(campeonatoGuardado)
       campeonato.partida_actual = 1
       localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+      
+      // Disparar evento de storage para actualizar otros componentes
       window.dispatchEvent(new Event('storage'))
+      
+      // Disparar evento específico para actualizar la asignación de mesas
+      window.dispatchEvent(new CustomEvent('update-asignacion-mesas'))
+      
+      console.log('Campeonato actualizado en localStorage con partida_actual = 1')
     }
 
     inscripcionFinalizada.value = true
+    // Redirigir a la vista de asignación de mesas
+    router.push(`/mesas/asignacion/${campeonatoId.value}`)
   } catch (error) {
     console.error('Error:', error)
     alert(error.message || 'Error al realizar el sorteo inicial')
@@ -319,14 +331,14 @@ const finalizarInscripcion = async () => {
 const verificarSorteoYResultados = async () => {
   try {
     // Verificar si existe el sorteo inicial
-    const responseSorteo = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/1`)
+    const responseSorteo = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId.value}/partida/1`)
     if (responseSorteo.ok) {
       const parejas = await responseSorteo.json()
       inscripcionFinalizada.value = parejas.length > 0
     }
 
     // Verificar si hay resultados
-    const responseResultados = await fetch(`http://localhost:8000/api/resultados/campeonato/${campeonatoId}/partida/1`)
+    const responseResultados = await fetch(`http://localhost:8000/api/resultados/campeonato/${campeonatoId.value}/partida/1`)
     if (responseResultados.ok) {
       const resultados = await responseResultados.json()
       hayResultados.value = resultados.length > 0
@@ -342,7 +354,7 @@ const volverAtras = async () => {
 
   try {
     // Eliminar las asignaciones de parejas y mesas
-    const response = await fetch(`http://localhost:8000/api/parejas-partida/eliminar/${campeonatoId}/1`, {
+    const response = await fetch(`http://localhost:8000/api/parejas-partida/eliminar/${campeonatoId.value}/1`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -354,6 +366,16 @@ const volverAtras = async () => {
     }
 
     inscripcionFinalizada.value = false
+    
+    // Actualizar el estado del campeonato en localStorage
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    if (campeonatoGuardado) {
+      const campeonato = JSON.parse(campeonatoGuardado)
+      campeonato.partida_actual = 0
+      localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+      window.dispatchEvent(new Event('storage'))
+    }
+    
     alert('Las asignaciones han sido eliminadas. Puede realizar un nuevo sorteo.')
   } catch (error) {
     console.error('Error:', error)
@@ -361,26 +383,50 @@ const volverAtras = async () => {
   }
 }
 
-const validarCampo = (event, campo) => {
-  const patron = /^[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]*$/
+const actualizarCampo = (event, campo) => {
   const valor = event.target.value
-  
-  if (!patron.test(valor)) {
-    // Si el valor no coincide con el patrón, eliminar el último carácter
-    jugador[campo] = valor.slice(0, -1)
+  // Permitir solo letras, espacios y caracteres especiales
+  const caracteresPermitidos = /^[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\s]*$/
+
+  if (campo === 'club') {
+    // Para club permitimos también guiones y puntos
+    const caracteresClubPermitidos = /^[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\s\-\.]*$/
+    if (caracteresClubPermitidos.test(valor)) {
+      jugador.value[campo] = valor
+    }
+  } else {
+    if (caracteresPermitidos.test(valor)) {
+      jugador.value[campo] = valor
+    }
   }
 }
 
 const formularioValido = computed(() => {
-  const patron = /^[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\\s'\\-\\.]+$/
-  return patron.test(jugador.nombre) && 
-         patron.test(jugador.apellidos) &&
-         (!jugador.club || patron.test(jugador.club))
+  const nombreValido = jugador.value.nombre.trim().length > 0
+  const apellidosValidos = jugador.value.apellidos.trim().length > 0
+  // El club es opcional, así que no lo validamos si está vacío
+  const clubValido = !jugador.value.club || jugador.value.club.trim().length > 0
+
+  return nombreValido && apellidosValidos && clubValido
 })
 
 onMounted(async () => {
+  // Verificar si hay un campeonato seleccionado
+  const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+  if (!campeonatoId.value && campeonatoGuardado) {
+    const campeonato = JSON.parse(campeonatoGuardado)
+    campeonatoId.value = campeonato.id.toString()
+    jugador.value.campeonato_id = parseInt(campeonato.id)
+  }
+
+  if (!campeonatoId.value) {
+    console.error('No hay campeonato seleccionado')
+    router.push('/campeonatos')
+    return
+  }
+
   await verificarSorteoYResultados()
-  cargarJugadores()
+  await cargarJugadores()
   focusNombreInput()
 })
 </script>

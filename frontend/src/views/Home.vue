@@ -197,9 +197,7 @@ const cargarCampeonatos = async () => {
 }
 
 onMounted(async () => {
-  // Limpiar localStorage al iniciar
-  localStorage.clear()
-  
+  // No limpiar localStorage al iniciar, solo verificar si hay un campeonato seleccionado
   if (route.path === '/') {
     const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
     if (campeonatoGuardado) {

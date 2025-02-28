@@ -30,8 +30,8 @@ class ResultadoMesaInput(BaseModel):
     puntos_pareja1: int
     puntos_pareja2: Optional[int] = None
     # Manos ganadas
-    mesas_ganadas_pareja1: int
-    mesas_ganadas_pareja2: Optional[int] = None
+    manos_ganadas_pareja1: int
+    manos_ganadas_pareja2: Optional[int] = None
 
     @validator('jugador2_id', 'jugador3_id', 'jugador4_id')
     def validar_jugadores_mesa_normal(cls, v, values):
@@ -60,8 +60,8 @@ class ResultadoMesaInput(BaseModel):
                 "jugador4_id": 4,
                 "puntos_pareja1": 100,
                 "puntos_pareja2": 80,
-                "mesas_ganadas_pareja1": 2,
-                "mesas_ganadas_pareja2": 1
+                "manos_ganadas_pareja1": 2,
+                "manos_ganadas_pareja2": 1
             }
         }
 

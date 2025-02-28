@@ -144,12 +144,14 @@ const abrirRegistro = (mesa) => {
   // Verificar si es la última mesa
   const esUltima = mesa.numeroMesa === Math.max(...mesas.value.map(m => m.numeroMesa))
   mesaSeleccionada.value.esUltimaMesa = esUltima
+  resultadoExistente.value = null // Aseguramos que resultadoExistente sea null para nuevo registro
   showPopup.value = true
 }
 
 const cerrarPopup = () => {
   showPopup.value = false
   mesaSeleccionada.value = null
+  resultadoExistente.value = null
 }
 
 const onResultadoRegistrado = () => {
@@ -237,10 +239,25 @@ const cargarResultadoMesa = async (mesa) => {
     if (response.ok) {
       const resultados = await response.json()
       if (resultados.length > 0) {
-        // Agrupar resultados por pareja
-        const puntos_pareja1 = resultados.find(r => r.jugador === 1)?.PT || 0
-        const puntos_pareja2 = resultados.find(r => r.jugador === 3)?.PT || 0
-        return { puntos_pareja1, puntos_pareja2 }
+        // Obtener datos completos de ambas parejas
+        const pareja1 = resultados.find(r => r.jugador === 1)
+        const pareja2 = resultados.find(r => r.jugador === 3)
+        
+        // Incluir todos los campos necesarios para la actualización
+        return {
+          campeonato_id: campeonatoId,
+          partida: partidaActual.value,
+          mesa: mesa.numeroMesa,
+          es_ultima_mesa: mesa.esUltimaMesa,
+          jugador1_id: mesa.pareja1?.jugador1_id,
+          jugador2_id: mesa.pareja1?.jugador2_id,
+          jugador3_id: mesa.pareja2?.jugador1_id,
+          jugador4_id: mesa.pareja2?.jugador2_id,
+          puntos_pareja1: pareja1?.PT || 0,
+          puntos_pareja2: pareja2?.PT || 0,
+          manos_ganadas_pareja1: pareja1?.MG || 0,
+          manos_ganadas_pareja2: pareja2?.MG || 0
+        }
       }
     }
   } catch (error) {
@@ -254,6 +271,8 @@ const abrirModificacion = async (mesa) => {
   // Verificar si es la última mesa
   const esUltima = mesa.numeroMesa === Math.max(...mesas.value.map(m => m.numeroMesa))
   mesaSeleccionada.value.esUltimaMesa = esUltima
+  // Primero establecemos resultadoExistente a null antes de cargar el nuevo resultado
+  resultadoExistente.value = null
   resultadoExistente.value = await cargarResultadoMesa(mesa)
   showPopup.value = true
 }
