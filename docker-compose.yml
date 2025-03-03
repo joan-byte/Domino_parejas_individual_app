@@ -23,13 +23,7 @@ services:
 
   app:
     container_name: domino_parejas_individual_app
-    image: domino_parejas_individual:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-      tags:
-        - "domino_parejas_individual:latest"
-        - "domino_parejas_individual:1.0.0"
+    image: joanalba/domino_parejas_individual:latest
     platform: ${TARGETPLATFORM:-linux/amd64}
     ports:
       - "80:80"
