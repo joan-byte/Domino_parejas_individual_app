@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from ..db.base import Base
 
 class ParejaPartida(Base):
-    __tablename__ = "pareja_partida"  # Nombre corregido según el esquema
+    __tablename__ = "pareja_partida"  # Cambiado de "parejas_partida" a "pareja_partida"
     
     id = Column(Integer, primary_key=True, index=True)
     partida = Column(Integer, nullable=False)  # Número de partida en el campeonato

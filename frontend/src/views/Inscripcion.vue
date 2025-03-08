@@ -278,15 +278,17 @@ const guardarJugador = async () => {
 }
 
 const finalizarInscripcion = async () => {
-  // Verificar que hay suficientes jugadores activos (mínimo 4 para formar una mesa)
-  const jugadoresActivos = jugadores.value.filter(j => j.activo && j.campeonato_id === parseInt(campeonatoId.value))
-  if (jugadoresActivos.length < 4) {
-    alert('Se necesitan al menos 4 jugadores activos para realizar el sorteo')
-    return
+  // Obtener array de jugadores activos
+  const jugadoresActivos = jugadores.value.filter(j => j.activo);
+  
+  // Verificar que el número de jugadores activos es múltiplo de 4
+  if (jugadoresActivos.length % 4 !== 0) {
+    alert('Los jugadores activos deben ser múltiplo de 4');
+    return;
   }
 
   try {
-    // Realizar el sorteo inicial
+    // Realizar el sorteo inicial usando el array de jugadores activos
     const response = await fetch('http://localhost:8000/api/parejas-partida/sorteo-inicial/', {
       method: 'POST',
       headers: {
@@ -294,7 +296,7 @@ const finalizarInscripcion = async () => {
       },
       body: JSON.stringify({
         campeonato_id: parseInt(campeonatoId.value),
-        jugadores: jugadoresActivos.map(j => j.id)
+        jugadores: jugadoresActivos.map(j => j.id)  // Ahora sí podemos usar map() porque jugadoresActivos es un array
       })
     })
 
