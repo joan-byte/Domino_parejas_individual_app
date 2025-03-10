@@ -8,11 +8,6 @@ class ParejaNueva(BaseModel):
     jugador2_id: Optional[int] = None
     partida: int
 
-class AsignacionParejas(BaseModel):
-    campeonato_id: int
-    partida: int
-    parejas: List[ParejaNueva]
-
 class ParejaPartidaBase(BaseModel):
     partida: int
     mesa: int
@@ -24,7 +19,7 @@ class ParejaPartidaBase(BaseModel):
 class ParejaPartidaCreate(ParejaPartidaBase):
     pass
 
-class ParejaPartida(ParejaPartidaBase):
+class ParejaPartidaSchema(ParejaPartidaBase):
     id: int
     jugador1: Optional[Jugador] = None
     jugador2: Optional[Jugador] = None
@@ -32,14 +27,27 @@ class ParejaPartida(ParejaPartidaBase):
     class Config:
         from_attributes = True
 
+class AsignacionParejas(BaseModel):
+    campeonato_id: int
+    parejas: List[ParejaNueva]
+
 class SorteoInicial(BaseModel):
     campeonato_id: int
     jugadores: List[int]  # Lista de IDs de jugadores para sortear
 
 class SiguientePartidaResponse(BaseModel):
-    parejas: List[ParejaPartida]
-    jugadores_sin_asignar: List[int]
-    mesas_formadas: int
+    mensaje: str
+    nueva_partida: int
 
-    class Config:
-        from_attributes = True 
+class JugadorAsignadoSchema(BaseModel):
+    id: int
+    nombre: str
+    apellidos: str
+    club: Optional[str] = None
+    mesa: int
+    numero_pareja: int
+
+class MesaSchema(BaseModel):
+    numeroMesa: int
+    pareja1: Optional[ParejaPartidaSchema] = None
+    pareja2: Optional[ParejaPartidaSchema] = None 

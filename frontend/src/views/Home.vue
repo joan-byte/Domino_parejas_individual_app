@@ -167,32 +167,26 @@ watch(() => route.path, async (newPath) => {
 const cargarCampeonatos = async () => {
   try {
     const response = await axios.get('http://localhost:8000/api/campeonatos/')
-    const campeonatosData = response.data
-
-    // Procesar cada campeonato
-    for (const campeonato of campeonatosData) {
-      try {
-        const responsePartidas = await axios.get(`http://localhost:8000/api/parejas-partida/ultima-partida/${campeonato.id}`)
-        if (responsePartidas.data.tiene_registros) {
-          campeonato.partida_actual = responsePartidas.data.ultima_partida
-        } else {
-          campeonato.partida_actual = 0
+    if (response.status === 200) {
+      campeonatos.value = response.data
+      
+      // Para cada campeonato, obtener la información directamente del objeto campeonato
+      for (const campeonato of campeonatos.value) {
+        try {
+          // Usar la partida_actual que ya viene en el objeto campeonato
+          campeonato.ultima_partida = campeonato.partida_actual
+          
+          // Si necesitas más información específica sobre la partida, puedes hacer una solicitud adicional
+          // a un endpoint que sí exista, como por ejemplo:
+          // const partidaResponse = await axios.get(`http://localhost:8000/api/campeonatos/${campeonato.id}`)
+          // campeonato.ultima_partida = partidaResponse.data.partida_actual
+        } catch (error) {
+          console.error(`Error al obtener la última partida del campeonato ${campeonato.id}:`, error)
         }
-      } catch (error) {
-        console.error(`Error al obtener la última partida del campeonato ${campeonato.id}:`, error)
-        campeonato.partida_actual = 0
       }
     }
-
-    campeonatos.value = campeonatosData
-
-    // Verificar si hay un campeonato seleccionado después de cargar los datos
-    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
-    if (campeonatoGuardado && route.path === '/') {
-      campeonatoSeleccionado.value = JSON.parse(campeonatoGuardado)
-    }
   } catch (error) {
-    console.error('Error al cargar los campeonatos:', error)
+    console.error('Error al cargar campeonatos:', error)
   }
 }
 

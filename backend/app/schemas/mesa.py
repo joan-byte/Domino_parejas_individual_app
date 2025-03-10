@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
-from .pareja_partida import ParejaPartida as ParejaPartidaSchema
+from .pareja_partida import ParejaPartidaSchema
 
 class MesaBase(BaseModel):
     numero_mesa: int

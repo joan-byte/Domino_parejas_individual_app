@@ -1,21 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 import random
 from app.db.base import get_db
 from app.models.pareja_partida import ParejaPartida
 from app.models.resultado import Resultado
 from app.schemas.pareja_partida import (
+    ParejaPartidaSchema,
     ParejaPartidaCreate,
-    ParejaPartida as ParejaPartidaSchema,
-    SorteoInicial,
-    AsignacionParejas,
     ParejaNueva,
-    SiguientePartidaResponse
+    AsignacionParejas,
+    SorteoInicial,
+    SiguientePartidaResponse,
+    JugadorAsignadoSchema,
+    MesaSchema
 )
 from app.models.jugador import Jugador
 from app.models.campeonato import Campeonato
+from app.schemas.jugador import JugadorResponse
 
 router = APIRouter(
     prefix="/parejas-partida",
@@ -291,132 +294,135 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/campeonato/{campeonato_id}/partida/{partida}", response_model=List[ParejaPartidaSchema])
-def get_parejas_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
-    """Obtiene todas las parejas de una partida específica"""
-    try:
-        parejas = db.query(ParejaPartida).filter(
-            ParejaPartida.campeonato_id == campeonato_id,
-            ParejaPartida.partida == partida
-        ).all()
-
-        # Cargar los datos de los jugadores para cada pareja
-        for pareja in parejas:
-            # Cargar jugador1
-            pareja.jugador1 = db.query(Jugador).filter(Jugador.id == pareja.jugador1_id).first()
-            # Cargar jugador2
-            pareja.jugador2 = db.query(Jugador).filter(Jugador.id == pareja.jugador2_id).first()
-
-        return parejas
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/parejas-partida/mesa/{campeonato_id}/{partida}/{mesa}", response_model=List[ParejaPartidaSchema])
-def get_parejas_mesa(campeonato_id: int, partida: int, mesa: int, db: Session = Depends(get_db)):
-    """Obtiene las parejas de una mesa específica"""
+def get_parejas_by_campeonato_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Obtiene todas las parejas de un campeonato y partida específicos, solo con jugadores activos"""
+    # Obtener todas las parejas para este campeonato y partida
     parejas = db.query(ParejaPartida).filter(
         ParejaPartida.campeonato_id == campeonato_id,
-        ParejaPartida.partida == partida,
-        ParejaPartida.mesa == mesa
-    ).order_by(ParejaPartida.numero_pareja).all()
-    return parejas
+        ParejaPartida.partida == partida
+    ).order_by(
+        ParejaPartida.mesa,
+        ParejaPartida.numero_pareja
+    ).all()
+    
+    # Filtrar parejas para incluir solo jugadores activos
+    parejas_filtradas = []
+    for pareja in parejas:
+        # Verificar si jugador1 está activo
+        if pareja.jugador1 and pareja.jugador1.activo:
+            # Si jugador2 existe, verificar si está activo
+            if pareja.jugador2_id is None or (pareja.jugador2 and pareja.jugador2.activo):
+                parejas_filtradas.append(pareja)
+    
+    return parejas_filtradas
 
-@router.delete("/eliminar/{campeonato_id}/{partida}")
-def eliminar_parejas_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
-    """Elimina todas las parejas de una partida específica"""
+@router.get("/mesas/{campeonato_id}/{partida}", response_model=List[MesaSchema])
+def get_mesas_by_campeonato_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Obtiene todas las mesas con sus parejas para un campeonato y partida específicos, solo con jugadores activos"""
+    # Obtener todas las parejas para este campeonato y partida
+    parejas = db.query(ParejaPartida).filter(
+        ParejaPartida.campeonato_id == campeonato_id,
+        ParejaPartida.partida == partida
+    ).order_by(
+        ParejaPartida.mesa,
+        ParejaPartida.numero_pareja
+    ).all()
+    
+    # Filtrar parejas para incluir solo jugadores activos
+    parejas_filtradas = []
+    for pareja in parejas:
+        # Verificar si jugador1 está activo
+        if pareja.jugador1 and pareja.jugador1.activo:
+            # Si jugador2 existe, verificar si está activo
+            if pareja.jugador2_id is None or (pareja.jugador2 and pareja.jugador2.activo):
+                parejas_filtradas.append(pareja)
+    
+    # Agrupar parejas por mesa
+    mesas_dict = {}
+    for pareja in parejas_filtradas:
+        if pareja.mesa not in mesas_dict:
+            mesas_dict[pareja.mesa] = {
+                "numeroMesa": pareja.mesa,
+                "pareja1": None,
+                "pareja2": None
+            }
+        
+        if pareja.numero_pareja == 1:
+            mesas_dict[pareja.mesa]["pareja1"] = pareja
+        elif pareja.numero_pareja == 2:
+            mesas_dict[pareja.mesa]["pareja2"] = pareja
+    
+    # Convertir el diccionario a una lista ordenada por número de mesa
+    mesas = [mesas_dict[mesa_num] for mesa_num in sorted(mesas_dict.keys())]
+    
+    return mesas
+
+@router.get("/jugadores-sin-asignar/{campeonato_id}/{partida}", response_model=List[JugadorResponse])
+def get_jugadores_sin_asignar(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Obtiene todos los jugadores activos que no están asignados a ninguna pareja en la partida actual"""
+    # Obtener todos los jugadores activos del campeonato
+    jugadores_activos = db.query(Jugador).filter(
+        Jugador.campeonato_id == campeonato_id,
+        Jugador.activo == True
+    ).all()
+    
+    # Obtener los IDs de jugadores ya asignados a parejas en esta partida
+    jugadores_asignados = db.query(ParejaPartida.jugador1_id).filter(
+        ParejaPartida.campeonato_id == campeonato_id,
+        ParejaPartida.partida == partida
+    ).union_all(
+        db.query(ParejaPartida.jugador2_id).filter(
+            ParejaPartida.campeonato_id == campeonato_id,
+            ParejaPartida.partida == partida,
+            ParejaPartida.jugador2_id != None  # Excluir parejas con jugador2 nulo
+        )
+    ).all()
+    
+    jugadores_asignados_ids = {j[0] for j in jugadores_asignados}
+    
+    # Filtrar jugadores que no están asignados
+    jugadores_sin_asignar = [j for j in jugadores_activos if j.id not in jugadores_asignados_ids]
+    
+    return jugadores_sin_asignar
+
+@router.get("/jugadores-asignados/{campeonato_id}/{partida}", response_model=List[JugadorAsignadoSchema])
+def get_jugadores_asignados(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Obtiene todos los jugadores activos asignados a parejas en la partida actual con información de su mesa y pareja"""
+    # Obtener todas las parejas para este campeonato y partida
     parejas = db.query(ParejaPartida).filter(
         ParejaPartida.campeonato_id == campeonato_id,
         ParejaPartida.partida == partida
     ).all()
     
-    if not parejas:
-        raise HTTPException(status_code=404, detail="No se encontraron parejas para eliminar")
+    jugadores_asignados = []
     
     for pareja in parejas:
-        db.delete(pareja)
+        # Agregar jugador1 si está activo
+        if pareja.jugador1 and pareja.jugador1.activo:
+            jugadores_asignados.append({
+                "id": pareja.jugador1.id,
+                "nombre": pareja.jugador1.nombre,
+                "apellidos": pareja.jugador1.apellidos,
+                "club": pareja.jugador1.club,
+                "mesa": pareja.mesa,
+                "numero_pareja": pareja.numero_pareja
+            })
+        
+        # Agregar jugador2 si existe y está activo
+        if pareja.jugador2 and pareja.jugador2.activo:
+            jugadores_asignados.append({
+                "id": pareja.jugador2.id,
+                "nombre": pareja.jugador2.nombre,
+                "apellidos": pareja.jugador2.apellidos,
+                "club": pareja.jugador2.club,
+                "mesa": pareja.mesa,
+                "numero_pareja": pareja.numero_pareja
+            })
     
-    db.commit()
-    return {"message": "Parejas eliminadas correctamente"}
-
-@router.post("/parejas-partida/asignar", response_model=List[ParejaPartidaSchema])
-def asignar_parejas(datos: AsignacionParejas, db: Session = Depends(get_db)):
-    """Asigna las parejas para una partida.
-    Solo permite asignar jugadores que estén activos."""
-    try:
-        # Obtener jugadores activos
-        jugadores_activos = db.query(Jugador.id).filter(
-            Jugador.campeonato_id == datos.campeonato_id,
-            Jugador.activo == True
-        ).all()
-        
-        jugadores_activos_ids = {j[0] for j in jugadores_activos}
-        
-        # Verificar que todos los jugadores en las parejas estén activos
-        for pareja in datos.parejas:
-            if pareja.jugador1_id not in jugadores_activos_ids or pareja.jugador2_id not in jugadores_activos_ids:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Solo se pueden asignar jugadores activos"
-                )
-        
-        nuevas_parejas = []
-        # Agrupar parejas por mesa
-        parejas_por_mesa = {}
-        for pareja in datos.parejas:
-            if pareja.mesa not in parejas_por_mesa:
-                parejas_por_mesa[pareja.mesa] = []
-            parejas_por_mesa[pareja.mesa].append(pareja)
-        
-        # Crear las parejas asignando el número correcto
-        for mesa, parejas in parejas_por_mesa.items():
-            for i, pareja in enumerate(parejas, 1):
-                nueva_pareja = ParejaPartida(
-                    partida=pareja.partida,
-                    mesa=pareja.mesa,
-                    jugador1_id=pareja.jugador1_id,
-                    jugador2_id=pareja.jugador2_id,
-                    numero_pareja=i,  # 1 para la primera pareja, 2 para la segunda
-                    campeonato_id=datos.campeonato_id
-                )
-                db.add(nueva_pareja)
-                nuevas_parejas.append(nueva_pareja)
-        
-        db.commit()
-        for pareja in nuevas_parejas:
-            db.refresh(pareja)
-        
-        return nuevas_parejas
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al asignar parejas: {str(e)}")
-
-@router.get("/ultima-partida/{campeonato_id}")
-def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
-    """Obtiene el número de la última partida registrada para un campeonato"""
-    try:
-        # Verificar si el campeonato existe
-        campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
-        if not campeonato:
-            raise HTTPException(status_code=404, detail="Campeonato no encontrado")
-
-        # Verificar si existen registros para este campeonato
-        existe_registro = db.query(ParejaPartida).filter(
-            ParejaPartida.campeonato_id == campeonato_id
-        ).first()
-        
-        if not existe_registro:
-            return {"ultima_partida": 0, "tiene_registros": False}
-            
-        ultima_partida = db.query(func.max(ParejaPartida.partida)).filter(
-            ParejaPartida.campeonato_id == campeonato_id
-        ).scalar()
-        
-        return {
-            "ultima_partida": ultima_partida if ultima_partida is not None else 0,
-            "tiene_registros": True
-        }
-    except Exception as e:
-        print(f"Error al obtener última partida: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error al obtener última partida: {str(e)}")
+    # Ordenar por ID de jugador
+    jugadores_asignados.sort(key=lambda x: x["id"])
+    
+    return jugadores_asignados
 
 @router.post("/partidas/cerrar/{campeonato_id}/{partida}")
 async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
@@ -463,36 +469,26 @@ async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends
                 detail=f"Faltan resultados para los siguientes jugadores: {list(jugadores_sin_resultado)}"
             )
         
-        # Obtener la última partida registrada
-        ultima_partida = db.query(func.max(ParejaPartida.partida)).filter(
-            ParejaPartida.campeonato_id == campeonato_id
-        ).scalar() or 0
-
-        # Actualizar la partida actual del campeonato
-        nueva_partida = max(partida + 1, ultima_partida + 1)
-        campeonato.partida_actual = nueva_partida
-            
-        # Verificar si esta es la última partida
-        if campeonato.partida_actual > campeonato.numero_partidas:
+        # Si es la última partida, finalizar el campeonato
+        if partida >= campeonato.numero_partidas:
             campeonato.finalizado = True
+            campeonato.partida_actual = partida  # Mantener la última partida como actual
+            db.commit()
+            return {"mensaje": "Campeonato finalizado", "nueva_partida": partida}
         
+        # Si no es la última, crear la siguiente partida
+        nueva_partida = partida + 1
+        
+        # Actualizar la partida actual del campeonato
+        campeonato.partida_actual = nueva_partida
         db.commit()
-        return {
-            "message": "Partida cerrada exitosamente",
-            "nueva_partida": campeonato.partida_actual,
-            "campeonato_finalizado": campeonato.finalizado
-        }
-            
-    except HTTPException as he:
-        db.rollback()
-        raise he
+        
+        # Crear parejas para la siguiente partida basadas en el ranking
+        return await crear_parejas_siguiente_partida(campeonato_id, partida, db)
+    
     except Exception as e:
         db.rollback()
-        print(f"Error al cerrar partida: {str(e)}")  # Añadir log del error
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al cerrar la partida: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/corregir-asignacion/{campeonato_id}/{partida}", response_model=List[ParejaPartidaSchema])
 def corregir_asignacion_parejas(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
@@ -675,4 +671,32 @@ async def actualizar_partida_actual(campeonato_id: int, partida: int, db: Sessio
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/eliminar/{campeonato_id}/{partida}")
+def eliminar_parejas_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Elimina todas las parejas de una partida específica"""
+    parejas = db.query(ParejaPartida).filter(
+        ParejaPartida.campeonato_id == campeonato_id,
+        ParejaPartida.partida == partida
+    ).all()
+    
+    if not parejas:
+        raise HTTPException(status_code=404, detail="No se encontraron parejas para eliminar")
+    
+    for pareja in parejas:
+        db.delete(pareja)
+    
+    db.commit()
+    return {"message": "Parejas eliminadas correctamente"}
+
+@router.get("/ultima-partida/{campeonato_id}")
+def get_ultima_partida(campeonato_id: int, db: Session = Depends(get_db)):
+    """Obtiene la última partida de un campeonato"""
+    # Verificar que el campeonato existe
+    campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+    if not campeonato:
+        raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+    
+    # Devolver la partida actual del campeonato
+    return {"ultima_partida": campeonato.partida_actual} 

@@ -1,241 +1,189 @@
-<template>
-  <div class="registro-mesas">
-    <div class="header">
-      <div class="header-left">
-        <h2>Registro de Mesas</h2>
-        <div class="visualizacion-control">
-          <button
-            class="btn-visualizacion"
-            :class="{ active: vistaSecundaria === 'ranking' }"
-            @click="cambiarVista('ranking')"
-          >
-            Ranking
-          </button>
-          <button
-            class="btn-visualizacion"
-            :class="{ active: vistaSecundaria === 'mesas' }"
-            @click="cambiarVista('mesas')"
-          >
-            Mesas
-          </button>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="partida-info">Partida {{ partidaActual }}</div>
-        <button
-          class="btn-cerrar-partida"
-          :disabled="!todasMesasRegistradas"
-          @click="cerrarPartida"
-        >
-          {{ textoCerrarPartida }}
-        </button>
-      </div>
-    </div>
-    
-    <div class="mesas-grid" v-if="mesasConParejas.length > 0">
-      <div class="mesa-card" v-for="mesa in mesasConParejas" :key="mesa.numeroMesa">
-        <div class="mesa-header">
-          <h3>Mesa {{ mesa.numeroMesa }}</h3>
-        </div>
-        
-        <div class="parejas-container">
-          <div class="parejas-row">
-            <div class="pareja-info">
-              <span class="pareja-label">Pareja 1:</span>
-              <div class="jugadores">
-                <span class="jugador" v-if="mesa.pareja1?.jugador1">
-                  {{ mesa.pareja1.jugador1_id }} - {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
-                </span>
-                <template v-if="mesa.pareja1?.jugador2">
-                  <span class="jugador-separator">/</span>
-                  <span class="jugador">
-                    {{ mesa.pareja1.jugador2_id }} - {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
-                  </span>
-                </template>
-              </div>
-            </div>
-            <div class="separator">vs</div>
-            <div class="pareja-info">
-              <span class="pareja-label">Pareja 2:</span>
-              <div class="jugadores">
-                <span class="jugador" v-if="mesa.pareja2?.jugador1">
-                  {{ mesa.pareja2.jugador1_id }} - {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
-                </span>
-                <template v-if="mesa.pareja2?.jugador2">
-                  <span class="jugador-separator">/</span>
-                  <span class="jugador">
-                    {{ mesa.pareja2.jugador2_id }} - {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
-                  </span>
-                </template>
-              </div>
-            </div>
-          </div>
-          <div class="actions">
-            <button 
-              :class="{
-                'btn-registrar': true,
-                'btn-primary': !mesasRegistradas[mesa.numeroMesa],
-                'btn-secondary': mesasRegistradas[mesa.numeroMesa]
-              }"
-              @click="abrirRegistro(mesa)"
-              :disabled="mesasRegistradas[mesa.numeroMesa]"
-            >
-              Registrar
-            </button>
-            <button 
-              :class="{
-                'btn-modificar': true,
-                'btn-primary': mesasRegistradas[mesa.numeroMesa],
-                'btn-secondary': !mesasRegistradas[mesa.numeroMesa]
-              }"
-              @click="abrirModificacion(mesa)"
-              :disabled="!mesasRegistradas[mesa.numeroMesa]"
-            >
-              Modificar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-else>
-      <p>No hay mesas asignadas todavía.</p>
-    </div>
-
-    <ResultadoMesaPopup
-      v-model:show="showPopup"
-      :mesa="mesaSeleccionada"
-      :campeonato-id="campeonatoId"
-      :partida-actual="partidaActual"
-      :resultado-existente="resultadoExistente"
-      :es-ultima-mesa="mesaSeleccionada?.esUltimaMesa"
-      @close="cerrarPopup"
-      @resultado-registrado="onResultadoRegistrado"
-    />
-  </div>
-</template>
-
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useEventBus } from '@vueuse/core'
-import ResultadoMesaPopup from '@/components/ResultadoMesaPopup.vue'
-import router from '@/router'
+import ResultadoMesaPopup from '../../components/ResultadoMesaPopup.vue'
 
 const route = useRoute()
-const campeonatoId = parseInt(route.params.campeonatoId)
-const mesas = ref([])
-const mesasRegistradas = ref({})
-const campeonatoSeleccionado = ref(null)
+const router = useRouter()
+const eventBus = useEventBus()
+
+const campeonatoId = ref(route.params.campeonatoId || '')
 const partidaActual = ref(null)
-const mesaSeleccionada = ref(null)
-const showPopup = ref(false)
 const esUltimaPartida = ref(false)
-const resultadoExistente = ref(null)
-
-// Crear el bus de eventos para actualizar el ranking
-const rankingBus = useEventBus('update-ranking')
-
-// Añadir nuevas variables para el control de visualización
-const vistaSecundaria = ref('ranking')
 const ventanaSecundaria = ref(null)
+const vistaSecundaria = ref('mesas')
+const mesas = ref([])
+const mesasConParejas = ref([])
+const mesasRegistradas = ref({})
+const resultadoExistente = ref(null)
+const showPopup = ref(false)
+const mesaSeleccionada = ref(null)
 
-const abrirRegistro = (mesa) => {
-  mesaSeleccionada.value = mesa
-  // Verificar si es la última mesa
-  const esUltima = mesa.numeroMesa === Math.max(...mesas.value.map(m => m.numeroMesa))
-  mesaSeleccionada.value.esUltimaMesa = esUltima
-  resultadoExistente.value = null // Aseguramos que resultadoExistente sea null para nuevo registro
-  showPopup.value = true
-}
+const textoCerrarPartida = computed(() => {
+  return esUltimaPartida.value ? 'Cerrar Campeonato' : 'Cerrar Partida'
+})
 
-const cerrarPopup = () => {
-  showPopup.value = false
-  mesaSeleccionada.value = null
-  resultadoExistente.value = null
-}
+const todasMesasRegistradas = ref(false)
 
-const onResultadoRegistrado = () => {
-  verificarMesasRegistradas()
-}
-
-const verificarMesasRegistradas = async () => {
+const cargarMesas = async () => {
+  if (!campeonatoId.value || !partidaActual.value) return
+  
   try {
-    const response = await fetch(`http://localhost:8000/api/resultados/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    const response = await fetch(`http://localhost:8000/api/parejas-partida/mesas/${campeonatoId.value}/${partidaActual.value}`)
     if (response.ok) {
-      const resultados = await response.json()
-      // Agrupar resultados por mesa
-      const mesasReg = {}
-      resultados.forEach(resultado => {
-        mesasReg[resultado.mesa] = true
-      })
-      mesasRegistradas.value = mesasReg
+      const mesasData = await response.json()
+      
+      // Asegurarse de que todas las propiedades necesarias existen
+      mesas.value = mesasData.map(mesa => ({
+        ...mesa,
+        pareja1: mesa.pareja1 ? {
+          ...mesa.pareja1,
+          jugador1: mesa.pareja1.jugador1 || null,
+          jugador2: mesa.pareja1.jugador2 || null
+        } : null,
+        pareja2: mesa.pareja2 ? {
+          ...mesa.pareja2,
+          jugador1: mesa.pareja2.jugador1 || null,
+          jugador2: mesa.pareja2.jugador2 || null
+        } : null
+      }))
+    } else {
+      console.error('Error al cargar mesas')
+      mesas.value = []
     }
   } catch (error) {
     console.error('Error:', error)
-  }
-}
-
-const cargarMesas = async () => {
-  try {
-    const response = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
-    if (!response.ok) {
-      throw new Error(`Error al cargar las mesas: ${response.statusText}`)
-    }
-    const data = await response.json()
-    
-    // Procesar los datos para agrupar las parejas por mesa
-    const mesasTemp = new Map()
-    
-    data.forEach(pareja => {
-      const mesaNum = pareja.mesa
-      if (!mesasTemp.has(mesaNum)) {
-        mesasTemp.set(mesaNum, {
-          numeroMesa: mesaNum,
-          pareja1: null,
-          pareja2: null
-        })
-      }
-      
-      const mesa = mesasTemp.get(mesaNum)
-      if (pareja.numero_pareja === 1) {
-        mesa.pareja1 = pareja
-      } else if (pareja.numero_pareja === 2) {
-        mesa.pareja2 = pareja
-      }
-    })
-    
-    // Convertir el Map a un array y ordenar por número de mesa
-    mesas.value = Array.from(mesasTemp.values())
-      .sort((a, b) => a.numeroMesa - b.numeroMesa)
-    
-    await verificarMesasRegistradas()
-  } catch (error) {
-    console.error('Error al cargar las mesas:', error)
     mesas.value = []
   }
 }
 
-const mesasConParejas = computed(() => {
-  return mesas.value || []
+const verificarMesasRegistradas = async () => {
+  if (!campeonatoId.value || !partidaActual.value) return
+  
+  try {
+    // Intentar obtener los resultados de las mesas desde otra ruta existente
+    const response = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId.value}?partida=${partidaActual.value}`)
+    if (response.ok) {
+      const data = await response.json()
+      
+      // Procesar los datos para determinar qué mesas tienen resultados registrados
+      // Este procesamiento dependerá de la estructura de datos que devuelva la API
+      const mesasConResultados = {}
+      let todasRegistradas = true
+      
+      // Ejemplo de cómo podrías procesar los datos (ajustar según la estructura real)
+      if (data && Array.isArray(data)) {
+        // Suponiendo que los datos contienen información sobre las mesas con resultados
+        data.forEach(item => {
+          if (item.mesa) {
+            mesasConResultados[item.mesa] = true
+          }
+        })
+        
+        // Verificar si todas las mesas tienen resultados
+        if (mesas.value && mesas.value.length > 0) {
+          todasRegistradas = mesas.value.every(mesa => mesasConResultados[mesa.numeroMesa])
+        } else {
+          todasRegistradas = false
+        }
+      }
+      
+      mesasRegistradas.value = mesasConResultados
+      todasMesasRegistradas.value = todasRegistradas
+      
+      console.log('Mesas registradas:', mesasRegistradas.value)
+      console.log('Todas las mesas registradas:', todasMesasRegistradas.value)
+    } else {
+      console.error('Error al verificar mesas registradas')
+      // Inicializar con valores por defecto para evitar errores
+      mesasRegistradas.value = {}
+      todasMesasRegistradas.value = false
+    }
+  } catch (error) {
+    console.error('Error:', error)
+    // Inicializar con valores por defecto para evitar errores
+    mesasRegistradas.value = {}
+    todasMesasRegistradas.value = false
+  }
+}
+
+const recargarEstadoCampeonato = async () => {
+  try {
+    // Verificar si campeonatoId.value está definido
+    if (!campeonatoId.value) {
+      console.error('ID de campeonato no definido')
+      
+      // Intentar obtener el ID del campeonato del localStorage
+      const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+      if (campeonatoGuardado) {
+        const campeonato = JSON.parse(campeonatoGuardado)
+        campeonatoId.value = campeonato.id.toString()
+      } else {
+        // Si no hay campeonato guardado, redirigir a la página de campeonatos
+        router.push('/campeonatos')
+        return false
+      }
+    }
+    
+    const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId.value}`)
+    if (!response.ok) {
+      console.error('Error al obtener información del campeonato')
+      return false
+    }
+    
+    const campeonato = await response.json()
+    partidaActual.value = campeonato.partida_actual
+    
+    // Actualizar el estado del campeonato en localStorage
+    localStorage.setItem('campeonatoSeleccionado', JSON.stringify(campeonato))
+    
+    return true
+  } catch (error) {
+    console.error('Error al recargar estado del campeonato:', error)
+    return false
+  }
+}
+
+const verificarCampeonato = async () => {
+  if (!campeonatoId.value) {
+    // Intentar obtener el ID del campeonato del localStorage
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    if (campeonatoGuardado) {
+      const campeonato = JSON.parse(campeonatoGuardado)
+      campeonatoId.value = campeonato.id.toString()
+    } else {
+      // Si no hay campeonato guardado, redirigir a la página de campeonatos
+      router.push('/campeonatos')
+      return false
+    }
+  }
+  
+  try {
+    await recargarEstadoCampeonato()
+    await cargarMesas()
+    await verificarMesasRegistradas()
+    return true
+  } catch (error) {
+    console.error('Error:', error)
+    return false
+  }
+}
+
+onMounted(async () => {
+  await verificarCampeonato()
+  
+  // Escuchar eventos de actualización del ranking
+  window.addEventListener('ranking-update', verificarMesasRegistradas)
 })
 
-const todasMesasRegistradas = computed(() => {
-  if (!mesasConParejas.value.length) return false
-  
-  // Verificar que todas las mesas tienen resultados registrados
-  const todasRegistradas = mesasConParejas.value.every(mesa => {
-    const tieneResultado = mesasRegistradas.value[mesa.numeroMesa] === true
-    console.log(`Mesa ${mesa.numeroMesa}: ${tieneResultado ? 'tiene resultado' : 'no tiene resultado'}`)
-    return tieneResultado
-  })
-  
-  console.log('¿Todas las mesas registradas?:', todasRegistradas)
-  return todasRegistradas
+onUnmounted(() => {
+  window.removeEventListener('ranking-update', verificarMesasRegistradas)
 })
 
 const cargarResultadoMesa = async (mesa) => {
   try {
-    const response = await fetch(`http://localhost:8000/api/resultados/mesa/${campeonatoId}/${partidaActual.value}/${mesa.numeroMesa}`)
+    const response = await fetch(`http://localhost:8000/api/resultados/mesa/${campeonatoId.value}/${partidaActual.value}/${mesa.numeroMesa}`)
     if (response.ok) {
       const resultados = await response.json()
       if (resultados.length > 0) {
@@ -245,7 +193,7 @@ const cargarResultadoMesa = async (mesa) => {
         
         // Incluir todos los campos necesarios para la actualización
         return {
-          campeonato_id: campeonatoId,
+          campeonato_id: campeonatoId.value,
           partida: partidaActual.value,
           mesa: mesa.numeroMesa,
           es_ultima_mesa: mesa.esUltimaMesa,
@@ -267,14 +215,26 @@ const cargarResultadoMesa = async (mesa) => {
 }
 
 const abrirModificacion = async (mesa) => {
-  mesaSeleccionada.value = mesa
+  // Asegurarse de que mesaSeleccionada tenga un valor válido
+  mesaSeleccionada.value = { ...mesa }
+  
   // Verificar si es la última mesa
   const esUltima = mesa.numeroMesa === Math.max(...mesas.value.map(m => m.numeroMesa))
   mesaSeleccionada.value.esUltimaMesa = esUltima
+  
   // Primero establecemos resultadoExistente a null antes de cargar el nuevo resultado
   resultadoExistente.value = null
-  resultadoExistente.value = await cargarResultadoMesa(mesa)
+  
+  // Intentar cargar el resultado existente si ya hay uno registrado
+  if (mesasRegistradas.value[mesa.numeroMesa]) {
+    resultadoExistente.value = await cargarResultadoMesa(mesa)
+  }
+  
+  // Mostrar el popup
   showPopup.value = true
+  
+  console.log('Abriendo modificación para mesa:', mesa.numeroMesa)
+  console.log('Mesa seleccionada:', mesaSeleccionada.value)
 }
 
 const onResultadoGuardado = async (resultado) => {
@@ -306,7 +266,7 @@ const cerrarPartida = async () => {
     await recargarEstadoCampeonato()
 
     // 1. Cerrar la partida actual
-    const responseCierre = await fetch(`http://localhost:8000/api/parejas-partida/partidas/cerrar/${campeonatoId}/${partidaActual.value}`, {
+    const responseCierre = await fetch(`http://localhost:8000/api/parejas-partida/partidas/cerrar/${campeonatoId.value}/${partidaActual.value}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -323,7 +283,7 @@ const cerrarPartida = async () => {
 
     // Si es la última partida, finalizar el campeonato
     if (esUltimaPartida.value) {
-      const responseFinalizar = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}/finalizar`, {
+      const responseFinalizar = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId.value}/finalizar`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -338,7 +298,7 @@ const cerrarPartida = async () => {
       
       // Actualizar la ventana secundaria para mostrar el podium
       if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
-        ventanaSecundaria.value.location.href = `/resultados/podium/${campeonatoId}`
+        ventanaSecundaria.value.location.href = `/resultados/podium/${campeonatoId.value}`
       }
       
       // Limpiar localStorage y redirigir la ventana principal
@@ -348,7 +308,7 @@ const cerrarPartida = async () => {
     }
 
     // 2. Obtener el ranking actualizado
-    const responseRanking = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId}`)
+    const responseRanking = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId.value}`)
     if (!responseRanking.ok) {
       throw new Error('Error al obtener el ranking')
     }
@@ -356,7 +316,7 @@ const cerrarPartida = async () => {
 
     // 3. Crear las nuevas parejas según el ranking para la siguiente partida
     try {
-      const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/siguiente-partida/${campeonatoId}/${nuevaPartida - 1}`, {
+      const responseNuevasParejas = await fetch(`http://localhost:8000/api/parejas-partida/siguiente-partida/${campeonatoId.value}/${nuevaPartida - 1}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -382,7 +342,7 @@ const cerrarPartida = async () => {
       
       // Actualizar la ventana secundaria
       if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
-        ventanaSecundaria.value.location.href = `/mesas/asignacion/${campeonatoId}`
+        ventanaSecundaria.value.location.href = `/mesas/asignacion/${campeonatoId.value}`
         vistaSecundaria.value = 'mesas'
       }
       
@@ -407,8 +367,8 @@ const cambiarVista = (vista) => {
   } else {
     // Actualizar la URL de la ventana existente con la partida actual
     const ruta = vista === 'ranking' 
-      ? `/resultados/ranking/${campeonatoId}?partida=${partidaActual.value}`
-      : `/mesas/asignacion/${campeonatoId}`
+      ? `/resultados/ranking/${campeonatoId.value}?partida=${partidaActual.value}`
+      : `/mesas/asignacion/${campeonatoId.value}`
     ventanaSecundaria.value.location.href = ruta
   }
 }
@@ -422,16 +382,16 @@ const abrirVentanaSecundaria = (vista) => {
     if (ventanaExistente && !ventanaExistente.closed) {
       ventanaSecundaria.value = ventanaExistente
       const ruta = vista === 'ranking' 
-        ? `/resultados/ranking/${campeonatoId}?partida=${partidaActual.value}`
-        : `/mesas/asignacion/${campeonatoId}`
+        ? `/resultados/ranking/${campeonatoId.value}?partida=${partidaActual.value}`
+        : `/mesas/asignacion/${campeonatoId.value}`
       ventanaSecundaria.value.location.href = ruta
       return
     }
   }
 
   const ruta = vista === 'ranking' 
-    ? `/resultados/ranking/${campeonatoId}?partida=${partidaActual.value}`
-    : `/mesas/asignacion/${campeonatoId}`
+    ? `/resultados/ranking/${campeonatoId.value}?partida=${partidaActual.value}`
+    : `/mesas/asignacion/${campeonatoId.value}`
     
   // Abrir nueva ventana si no existe
   ventanaSecundaria.value = window.open(
@@ -445,104 +405,164 @@ const abrirVentanaSecundaria = (vista) => {
     localStorage.setItem('ventanaSecundaria', 'true')
   }
 }
-
-// Función para forzar la recarga del estado del campeonato
-const recargarEstadoCampeonato = async () => {
-  try {
-    // Obtener la última partida con parejas asignadas
-    const responseUltimaPartida = await fetch(`http://localhost:8000/api/parejas-partida/ultima-partida/${campeonatoId}`)
-    if (!responseUltimaPartida.ok) {
-      throw new Error('Error al obtener la última partida')
-    }
-    const { ultima_partida } = await responseUltimaPartida.json()
-    
-    // Obtener el estado del campeonato
-    const response = await fetch(`http://localhost:8000/api/campeonatos/${campeonatoId}`)
-    if (!response.ok) {
-      throw new Error('Error al obtener información del campeonato')
-    }
-    const campeonato = await response.json()
-    console.log('Estado del campeonato recargado:', campeonato)
-    
-    // Asegurarnos de que la partida actual coincida con la última partida con parejas
-    campeonatoSeleccionado.value = campeonato
-    partidaActual.value = ultima_partida
-    
-    // Corregir el cálculo de última partida
-    esUltimaPartida.value = ultima_partida === campeonato.numero_partidas
-    
-    console.log('Partida actual:', partidaActual.value)
-    console.log('Número total de partidas:', campeonato.numero_partidas)
-    console.log('Es última partida:', esUltimaPartida.value)
-    
-    // Actualizar la vista secundaria si existe
-    if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
-      cambiarVista(vistaSecundaria.value)
-    }
-    
-    await cargarMesas()
-  } catch (error) {
-    console.error('Error al recargar estado:', error)
-    alert('Error al recargar el estado del campeonato')
-  }
-}
-
-// Modificar onMounted para usar la nueva función
-onMounted(async () => {
-  try {
-    // Limpiar todo el localStorage relacionado con el campeonato
-    localStorage.clear()
-    
-    // Recargar el estado inicial
-    await recargarEstadoCampeonato()
-    
-    // Verificar si ya existe una ventana secundaria
-    const ventanaGuardada = localStorage.getItem('ventanaSecundaria')
-    if (!ventanaGuardada) {
-      abrirVentanaSecundaria('ranking')
-    }
-  } catch (error) {
-    console.error('Error al cargar el campeonato:', error)
-    alert('Error al cargar el campeonato: ' + error.message)
-    router.push('/')
-  }
-})
-
-// Eliminar el cierre de la ventana en onUnmounted
-onUnmounted(() => {
-  // No cerramos la ventana secundaria al desmontar
-})
-
-const textoCerrarPartida = computed(() => {
-  return esUltimaPartida.value ? 'Cerrar Campeonato' : 'Cerrar Partida'
-})
 </script>
 
+<template>
+  <div class="registro-mesas-container">
+    <div class="header-section">
+      <div class="header-left">
+        <h2>Registro de Resultados</h2>
+        <div class="partida-info">Partida {{ partidaActual }}</div>
+      </div>
+      <div class="header-right">
+        <div class="visualizacion-control">
+          <button 
+            @click="cambiarVista('mesas')" 
+            class="btn-visualizacion"
+            :class="{ active: vistaSecundaria === 'mesas' }"
+          >
+            Ver Asignación
+          </button>
+          <button 
+            @click="cambiarVista('ranking')" 
+            class="btn-visualizacion"
+            :class="{ active: vistaSecundaria === 'ranking' }"
+          >
+            Ver Ranking
+          </button>
+        </div>
+        <div class="actions">
+          <button 
+            @click="cerrarPartida" 
+            class="btn-cerrar-partida"
+            :disabled="!todasMesasRegistradas"
+            :title="!todasMesasRegistradas ? 'Debe registrar los resultados de todas las mesas para cerrar la partida' : textoCerrarPartida"
+          >
+            {{ textoCerrarPartida }}
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="mesas-section">
+      <h3>Mesas</h3>
+      <div class="mesas-grid">
+        <div v-for="mesa in mesas" :key="mesa.numeroMesa" class="mesa-card">
+          <div class="mesa-header">
+            <h4>Mesa {{ mesa.numeroMesa }}</h4>
+            <div 
+              :class="['estado-registro', mesasRegistradas[mesa.numeroMesa] ? 'registrado' : 'pendiente']"
+              :title="mesasRegistradas[mesa.numeroMesa] ? 'Resultados registrados' : 'Pendiente de registro'"
+            >
+              {{ mesasRegistradas[mesa.numeroMesa] ? 'Registrado' : 'Pendiente' }}
+            </div>
+          </div>
+          <div class="parejas-container">
+            <div class="pareja">
+              <div class="pareja-header">Pareja 1</div>
+              <div class="jugadores">
+                <div class="jugador" v-if="mesa.pareja1?.jugador1">
+                  {{ mesa.pareja1?.jugador1_id }} - {{ mesa.pareja1?.jugador1?.nombre || '' }} {{ mesa.pareja1?.jugador1?.apellidos || '' }}
+                </div>
+                <div class="jugador-separator" v-if="mesa.pareja1?.jugador1 && mesa.pareja1?.jugador2">/</div>
+                <div class="jugador" v-if="mesa.pareja1?.jugador2">
+                  {{ mesa.pareja1?.jugador2_id }} - {{ mesa.pareja1?.jugador2?.nombre || '' }} {{ mesa.pareja1?.jugador2?.apellidos || '' }}
+                </div>
+              </div>
+            </div>
+            <div class="vs">vs</div>
+            <div class="pareja">
+              <div class="pareja-header">Pareja 2</div>
+              <div class="jugadores">
+                <div class="jugador" v-if="mesa.pareja2?.jugador1">
+                  {{ mesa.pareja2?.jugador1_id }} - {{ mesa.pareja2?.jugador1?.nombre || '' }} {{ mesa.pareja2?.jugador1?.apellidos || '' }}
+                </div>
+                <div class="jugador-separator" v-if="mesa.pareja2?.jugador1 && mesa.pareja2?.jugador2">/</div>
+                <div class="jugador" v-if="mesa.pareja2?.jugador2">
+                  {{ mesa.pareja2?.jugador2_id }} - {{ mesa.pareja2?.jugador2?.nombre || '' }} {{ mesa.pareja2?.jugador2?.apellidos || '' }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mesa-actions">
+            <button 
+              @click="abrirModificacion(mesa)" 
+              class="btn-registrar"
+            >
+              {{ mesasRegistradas[mesa.numeroMesa] ? 'Modificar' : 'Registrar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <ResultadoMesaPopup 
+      v-if="showPopup"
+      :show="showPopup" 
+      :mesa="mesaSeleccionada"
+      :campeonatoId="campeonatoId"
+      :partidaActual="partidaActual"
+      :resultadoExistente="resultadoExistente"
+      @close="showPopup = false"
+      @resultadoRegistrado="onResultadoGuardado"
+    />
+  </div>
+</template>
+
 <style scoped>
-.registro-mesas {
+.registro-mesas-container {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px 60px;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-.header {
+@media (max-width: 768px) {
+  .registro-mesas-container {
+    padding: 10px;
+  }
+}
+
+.header-section {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-}
-
-.header h2 {
-  margin: 0;
+  padding: 15px 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  flex-wrap: wrap;
+  gap: 15px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 20px;
+  flex-wrap: wrap;
+}
+
+.header-left h2 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.partida-info {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #4CAF50;
+  padding: 5px 10px;
+  background-color: #e8f5e9;
+  border-radius: 4px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 .visualizacion-control {
@@ -569,16 +589,9 @@ const textoCerrarPartida = computed(() => {
   background-color: #00008B; /* Azul oscuro */
 }
 
-.header-right {
+.actions {
   display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.partida-info {
-  font-size: 1.2em;
-  font-weight: bold;
-  color: #4CAF50;
+  justify-content: flex-end; /* Alinea el botón a la derecha */
 }
 
 .btn-cerrar-partida {
@@ -608,34 +621,66 @@ const textoCerrarPartida = computed(() => {
   opacity: 0.7;
 }
 
+.mesas-section {
+  margin-top: 30px;
+}
+
+.mesas-section h3 {
+  margin-bottom: 20px;
+  color: #2c3e50;
+}
+
 .mesas-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
   margin-top: 20px;
 }
 
 .mesa-card {
-  width: 100%;
   border: 1px solid #ddd;
   border-radius: 8px;
-  padding: 20px 40px;
+  padding: 20px;
   background-color: #fff;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  margin-bottom: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mesa-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .mesa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   background-color: #f5f5f5;
   padding: 10px;
   border-radius: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
-.mesa-header h3 {
+.mesa-header h4 {
   margin: 0;
   color: #2c3e50;
-  text-align: center;
+}
+
+.estado-registro {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: bold;
+}
+
+.registrado {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.pendiente {
+  background-color: #FFC107;
+  color: #333;
 }
 
 .parejas-container {
@@ -644,113 +689,125 @@ const textoCerrarPartida = computed(() => {
   gap: 15px;
 }
 
-.parejas-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  background-color: #f8f9fa;
-  padding: 15px 0;
+.pareja {
+  background-color: #f9f9f9;
   border-radius: 4px;
-  gap: 20px;
+  padding: 10px;
 }
 
-.pareja-info {
-  display: flex;
-  flex-direction: column;
-  background-color: white;
-  padding: 12px 15px;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-  width: calc(50% - 35px);
-  margin: 0 15px;
-  overflow: hidden;
-}
-
-.pareja-label {
+.pareja-header {
+  font-weight: bold;
+  margin-bottom: 8px;
   color: #4CAF50;
-  font-weight: bold;
-  font-size: 1.1em;
-  white-space: nowrap;
-  margin-right: 8px;
 }
 
-.separator {
-  font-weight: bold;
-  color: #666;
-  font-size: 1.1em;
-  width: 30px;
+.vs {
   text-align: center;
-  flex-shrink: 0;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-button {
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: none;
   font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.btn-primary {
-  background-color: #4CAF50;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: #45a049;
-}
-
-.btn-secondary {
-  background-color: #f0f0f0;
+  margin: 5px 0;
   color: #666;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #e0e0e0;
-}
-
-button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-  background-color: #f0f0f0 !important;
-  color: #666 !important;
 }
 
 .jugadores {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
+  gap: 8px;
 }
 
 .jugador {
   flex: 1;
-  padding: 0.5rem;
+  min-width: 150px;
+  padding: 8px;
   background-color: white;
   border-radius: 4px;
   border: 1px solid #e0e0e0;
-  font-size: 1em;
+  font-size: 0.9em;
   white-space: nowrap;
-  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .jugador-separator {
   color: #666;
+}
+
+.mesa-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+.btn-registrar {
+  background-color: #4CAF50;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
   font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-registrar:hover {
+  background-color: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+@media (max-width: 768px) {
+  .jugador {
+    min-width: 120px;
+    font-size: 0.85em;
+  }
+}
+
+@media (max-width: 576px) {
+  .jugadores {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .jugador {
+    width: 100%;
+  }
+  
+  .jugador-separator {
+    display: none;
+  }
+}
+
+/* Estilos globales para asegurar que el popup sea responsive */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0 1rem;
-  flex-shrink: 0;
+  z-index: 1000;
+}
+
+.popup-content {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+@media (max-width: 576px) {
+  .popup-content {
+    width: 95%;
+    padding: 15px;
+  }
 }
 </style> 
