@@ -322,33 +322,22 @@ async def get_ranking_campeonato(campeonato_id: int, partida: int = None, db: Se
     Si la partida especificada no tiene resultados, muestra los resultados hasta la última partida completada."""
     
     try:
-        # Primero obtenemos todos los jugadores del sorteo inicial
-        jugadores_sorteo = db.query(
-            ParejaPartida.jugador1_id.label('jugador_id'),
+        # Primero obtenemos todos los jugadores ACTIVOS del campeonato específico
+        jugadores_campeonato = db.query(
+            Jugador.id.label('jugador_id'),
             Jugador.nombre,
             Jugador.apellidos,
             Jugador.club
-        ).join(
-            Jugador, ParejaPartida.jugador1_id == Jugador.id
         ).filter(
-            ParejaPartida.campeonato_id == campeonato_id,
-            ParejaPartida.partida == 1
-        ).union(
-            db.query(
-                ParejaPartida.jugador2_id.label('jugador_id'),
-                Jugador.nombre,
-                Jugador.apellidos,
-                Jugador.club
-            ).join(
-                Jugador, ParejaPartida.jugador2_id == Jugador.id
-            ).filter(
-                ParejaPartida.campeonato_id == campeonato_id,
-                ParejaPartida.partida == 1
-            )
-        ).order_by('jugador_id').all()
-
-        if not jugadores_sorteo:
-            raise HTTPException(status_code=404, detail="No se encontraron jugadores para este campeonato")
+            Jugador.campeonato_id == campeonato_id,
+            Jugador.activo == True  # Solo jugadores activos
+        ).all()
+        
+        if not jugadores_campeonato:
+            raise HTTPException(status_code=404, detail="No se encontraron jugadores activos para este campeonato")
+            
+        # Crear una lista de IDs de jugadores del campeonato actual
+        jugadores_ids = [j.jugador_id for j in jugadores_campeonato]
 
         # Si se especifica una partida, verificar si tiene resultados
         if partida is not None:
@@ -378,7 +367,8 @@ async def get_ranking_campeonato(campeonato_id: int, partida: int = None, db: Se
             func.sum(Resultado.MG).label('MG'),
             func.max(Resultado.partida).label('ultima_partida')
         ).filter(
-            Resultado.campeonato_id == campeonato_id
+            Resultado.campeonato_id == campeonato_id,
+            Resultado.jugador_id.in_(jugadores_ids)  # Solo incluir jugadores de este campeonato
         )
 
         # Filtrar hasta la partida correspondiente si se especifica
@@ -395,7 +385,7 @@ async def get_ranking_campeonato(campeonato_id: int, partida: int = None, db: Se
 
         # Combinamos la información
         ranking_list = []
-        for jugador in jugadores_sorteo:
+        for jugador in jugadores_campeonato:  # Usar jugadores_campeonato en lugar de jugadores_sorteo
             resultados_jugador = resultados_dict.get(jugador.jugador_id)
             if resultados_jugador:
                 ranking_list.append({
