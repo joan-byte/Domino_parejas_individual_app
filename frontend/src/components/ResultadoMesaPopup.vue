@@ -169,8 +169,8 @@
         </div>
       </div>
 
-      <div class="error-message" v-if="pvIguales && !esUltimaMesaIncompleta">
-        Los PV no pueden ser iguales
+      <div class="error-message" v-if="pvIguales && !esMesaIncompleta">
+        Los PV no pueden ser iguales en una mesa completa
       </div>
 
       <div class="actions">
@@ -209,7 +209,7 @@ const props = defineProps({
     required: true
   },
   resultadoExistente: {
-    type: Object,
+    type: [Object, Array],
     default: null
   },
   esUltimaMesa: {
@@ -222,32 +222,185 @@ const emit = defineEmits(['close', 'resultadoRegistrado'])
 
 const puntosPareja1 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
 const puntosPareja2 = ref({ PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 })
-const campeonatoPM = ref(300) // Valor por defecto
+const campeonatoPM = ref(300)
+
+const limpiarCampos = () => {
+  puntosPareja1.value = { PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 }
+  puntosPareja2.value = { PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 }
+}
+
+const cerrar = () => {
+  limpiarCampos()
+  emit('close')
+}
+
+const tieneJugadoresActivosPareja2 = computed(() => {
+  return props.mesa.pareja2?.jugador1?.activo || props.mesa.pareja2?.jugador2?.activo
+})
+
+const esMesaIncompleta = computed(() => {
+  if (!props.mesa) return false
+  
+  const jugadoresInactivos = [
+    !props.mesa.pareja1?.jugador1?.activo,
+    !props.mesa.pareja1?.jugador2?.activo,
+    !props.mesa.pareja2?.jugador1?.activo,
+    !props.mesa.pareja2?.jugador2?.activo
+  ]
+
+  return jugadoresInactivos.some(inactivo => inactivo === true || inactivo === undefined)
+})
+
+const jugadoresActivos = computed(() => {
+  const jugadores = []
+  
+  if (props.mesa.pareja1?.jugador1?.activo) {
+    jugadores.push({
+      id: props.mesa.pareja1.jugador1_id,
+      numero: 1,
+      pareja: 1
+    })
+  }
+  if (props.mesa.pareja1?.jugador2?.activo) {
+    jugadores.push({
+      id: props.mesa.pareja1.jugador2_id,
+      numero: 2,
+      pareja: 1
+    })
+  }
+  
+  if (props.mesa.pareja2?.jugador1?.activo) {
+    jugadores.push({
+      id: props.mesa.pareja2.jugador1_id,
+      numero: 3,
+      pareja: 2
+    })
+  }
+  if (props.mesa.pareja2?.jugador2?.activo) {
+    jugadores.push({
+      id: props.mesa.pareja2.jugador2_id,
+      numero: 4,
+      pareja: 2
+    })
+  }
+  
+  return jugadores
+})
+
+const pvIguales = computed(() => {
+  if (esMesaIncompleta.value) return false
+  
+  const mesaCompleta = props.mesa.pareja1?.jugador1?.activo && 
+                      props.mesa.pareja1?.jugador2?.activo && 
+                      props.mesa.pareja2?.jugador1?.activo && 
+                      props.mesa.pareja2?.jugador2?.activo
+                      
+  return mesaCompleta && 
+         puntosPareja1.value.PV === puntosPareja2.value.PV && 
+         puntosPareja1.value.PV !== 0
+})
 
 const calcularPuntos = (parejaNum) => {
   const pareja = parejaNum === 1 ? puntosPareja1.value : puntosPareja2.value
   const parejaContraria = parejaNum === 1 ? puntosPareja2.value : puntosPareja1.value
   
-  // Validar PT (máximo el doble del PM)
-  if (pareja.PT < 0) pareja.PT = 0
-  if (pareja.PT > campeonatoPM.value * 2) pareja.PT = campeonatoPM.value * 2
-  
-  // Calcular PV usando el PM del campeonato
-  pareja.PV = Math.min(pareja.PT, campeonatoPM.value)
-  
-  // Calcular PC (diferencia entre PV)
-  pareja.PC = pareja.PV - parejaContraria.PV
-  parejaContraria.PC = parejaContraria.PV - pareja.PV
-  
-  // Calcular PG
-  pareja.PG = pareja.PC > 0 ? 1 : 0
-  parejaContraria.PG = parejaContraria.PC > 0 ? 1 : 0
+  if (esMesaIncompleta.value) {
+    const PT = Math.round(campeonatoPM.value / 2)
+    pareja.PT = PT
+    pareja.PV = PT
+    pareja.PC = PT
+    pareja.PG = 1
+    pareja.MG = Math.floor(PT / 30)
+    
+    if (parejaContraria && tieneJugadoresActivosPareja2.value) {
+      parejaContraria.PT = PT
+      parejaContraria.PV = PT
+      parejaContraria.PC = PT
+      parejaContraria.PG = 1
+      parejaContraria.MG = Math.floor(PT / 30)
+    }
+  } else {
+    if (pareja.PT < 0) pareja.PT = 0
+    if (pareja.PT > campeonatoPM.value * 2) pareja.PT = campeonatoPM.value * 2
+    
+    pareja.PV = Math.min(pareja.PT, campeonatoPM.value)
+    parejaContraria.PV = Math.min(parejaContraria.PT, campeonatoPM.value)
+    
+    pareja.PC = pareja.PV - parejaContraria.PV
+    parejaContraria.PC = parejaContraria.PV - pareja.PV
+    
+    pareja.PG = pareja.PC > 0 ? 1 : 0
+    parejaContraria.PG = parejaContraria.PC > 0 ? 1 : 0
+  }
 }
 
-// Crear el bus de eventos para actualizar el ranking
-const rankingBus = useEventBus('update-ranking')
+const asignarPuntosAutomaticos = () => {
+  const PT = Math.round(campeonatoPM.value / 2)
+  
+  const puntosAutomaticos = {
+    PT: PT,
+    PV: PT,
+    PC: PT,
+    PG: 1,
+    MG: Math.floor(PT / 30)
+  }
+  
+  if (props.mesa.pareja1?.jugador1?.activo || props.mesa.pareja1?.jugador2?.activo) {
+    puntosPareja1.value = { ...puntosAutomaticos }
+  }
+  
+  if (tieneJugadoresActivosPareja2.value) {
+    puntosPareja2.value = { ...puntosAutomaticos }
+  }
+}
 
-// Obtener el PM del campeonato al montar el componente
+const cargarResultadoExistente = () => {
+  console.log('Cargando resultado existente:', props.resultadoExistente)
+  
+  if (!props.resultadoExistente || !Array.isArray(props.resultadoExistente)) {
+    console.log('No hay resultado existente o no es un array')
+    return
+  }
+
+  try {
+    // Filtrar resultados por pareja
+    const resultadosPareja1 = props.resultadoExistente.filter(r => r.pareja === 1)
+    const resultadosPareja2 = props.resultadoExistente.filter(r => r.pareja === 2)
+
+    console.log('Resultados Pareja 1:', resultadosPareja1)
+    console.log('Resultados Pareja 2:', resultadosPareja2)
+
+    if (resultadosPareja1.length > 0) {
+      // Crear un nuevo objeto con todos los campos
+      puntosPareja1.value = {
+        PT: parseInt(resultadosPareja1[0].PT) || 0,
+        MG: parseInt(resultadosPareja1[0].MG) || 0,
+        PV: parseInt(resultadosPareja1[0].PV) || 0,
+        PG: parseInt(resultadosPareja1[0].PG) || 0,
+        PC: parseInt(resultadosPareja1[0].PC) || 0
+      }
+    }
+
+    if (resultadosPareja2.length > 0) {
+      // Crear un nuevo objeto con todos los campos
+      puntosPareja2.value = {
+        PT: parseInt(resultadosPareja2[0].PT) || 0,
+        MG: parseInt(resultadosPareja2[0].MG) || 0,
+        PV: parseInt(resultadosPareja2[0].PV) || 0,
+        PG: parseInt(resultadosPareja2[0].PG) || 0,
+        PC: parseInt(resultadosPareja2[0].PC) || 0
+      }
+    }
+
+    console.log('Puntos cargados:', {
+      puntosPareja1: puntosPareja1.value,
+      puntosPareja2: puntosPareja2.value
+    })
+  } catch (error) {
+    console.error('Error al procesar resultados:', error)
+  }
+}
+
 const obtenerPM = async () => {
   try {
     const response = await fetch(`http://localhost:8000/api/campeonatos/${props.campeonatoId}`)
@@ -260,144 +413,25 @@ const obtenerPM = async () => {
   }
 }
 
-// Llamar a obtenerPM cuando el componente se monta y cuando cambia el campeonatoId
-watch(() => props.campeonatoId, obtenerPM, { immediate: true })
-
-watch(() => props.resultadoExistente, (newVal) => {
-  if (newVal) {
-    puntosPareja1.value.PT = newVal.puntos_pareja1
-    puntosPareja1.value.MG = newVal.manos_ganadas_pareja1
-    puntosPareja2.value.PT = newVal.puntos_pareja2
-    puntosPareja2.value.MG = newVal.manos_ganadas_pareja2
-    calcularPuntos(1)
-    calcularPuntos(2)
-  }
-}, { immediate: true })
-
-const pvIguales = computed(() => {
-  // Solo validar PV iguales si la mesa está completa (tiene 4 jugadores)
-  const mesaCompleta = props.mesa.pareja1?.jugador1 && props.mesa.pareja1?.jugador2 && 
-                      props.mesa.pareja2?.jugador1 && props.mesa.pareja2?.jugador2;
-  return mesaCompleta && 
-         puntosPareja1.value.PV === puntosPareja2.value.PV && 
-         puntosPareja1.value.PV !== 0;
-})
-
-const validarPuntos = () => {
-  // Validar que los puntos totales estén dentro del rango (0 a 2*PM)
-  if (puntosPareja1.value.PT < 0 || puntosPareja1.value.PT > campeonatoPM.value * 2 ||
-      (props.mesa.pareja2?.jugador1 && (puntosPareja2.value.PT < 0 || puntosPareja2.value.PT > campeonatoPM.value * 2))) {
-    alert('Los puntos totales deben estar entre 0 y ' + (campeonatoPM.value * 2))
-    return false
-  }
-
-  // Validar que las manos ganadas estén dentro del rango (0-20)
-  if (puntosPareja1.value.MG < 0 || puntosPareja1.value.MG > 20 ||
-      (props.mesa.pareja2?.jugador1 && (puntosPareja2.value.MG < 0 || puntosPareja2.value.MG > 20))) {
-    alert('Las manos ganadas deben estar entre 0 y 20')
-    return false
-  }
-
-  // Solo validar PV iguales si la mesa está completa (tiene 4 jugadores)
-  const mesaCompleta = props.mesa.pareja1?.jugador1 && props.mesa.pareja1?.jugador2 && 
-                      props.mesa.pareja2?.jugador1 && props.mesa.pareja2?.jugador2;
-  
-  if (mesaCompleta && puntosPareja1.value.PV === puntosPareja2.value.PV && 
-      puntosPareja1.value.PV !== 0) {
-    alert('Los PV no pueden ser iguales en una mesa completa')
-    return false
-  }
-
-  return true
-}
-
-// Modificar el computed property para detectar si es una mesa incompleta
-const esMesaIncompleta = computed(() => {
-  if (!props.mesa) return false
-  
-  // Verificar si falta algún jugador o está inactivo
-  const jugadoresInactivos = [
-    !props.mesa.pareja1?.jugador1?.activo,
-    !props.mesa.pareja1?.jugador2?.activo,
-    !props.mesa.pareja2?.jugador1?.activo,
-    !props.mesa.pareja2?.jugador2?.activo
-  ]
-
-  // Si algún jugador está inactivo o falta (undefined/null), la mesa es incompleta
-  return jugadoresInactivos.some(inactivo => inactivo === true || inactivo === undefined)
-})
-
-// Añadir computed property para obtener los jugadores activos
-const jugadoresActivos = computed(() => {
-  const jugadores = []
-  
-  // Jugadores de la pareja 1
-  if (props.mesa.pareja1?.jugador1) {
-    jugadores.push({
-      id: props.mesa.pareja1.jugador1_id,
-      numero: 1,
-      pareja: 1
-    })
-  }
-  if (props.mesa.pareja1?.jugador2) {
-    jugadores.push({
-      id: props.mesa.pareja1.jugador2_id,
-      numero: 2,
-      pareja: 1
-    })
-  }
-  
-  // Jugadores de la pareja 2
-  if (props.mesa.pareja2?.jugador1) {
-    jugadores.push({
-      id: props.mesa.pareja2.jugador1_id,
-      numero: 3,
-      pareja: 2
-    })
-  }
-  if (props.mesa.pareja2?.jugador2) {
-    jugadores.push({
-      id: props.mesa.pareja2.jugador2_id,
-      numero: 4,
-      pareja: 2
-    })
-  }
-  
-  return jugadores
-})
-
 const guardarResultados = async () => {
   try {
-    // Preparar los datos para enviar
     const datos = {
       campeonato_id: parseInt(props.campeonatoId),
       partida: parseInt(props.partidaActual),
       mesa: parseInt(props.mesa.numeroMesa),
       es_ultima_mesa: props.esUltimaMesa || esMesaIncompleta.value,
-      // Jugadores de la primera pareja
       jugador1_id: props.mesa.pareja1?.jugador1_id || null,
       jugador2_id: props.mesa.pareja1?.jugador2_id || null,
-      // Jugadores de la segunda pareja
       jugador3_id: props.mesa.pareja2?.jugador1_id || null,
       jugador4_id: props.mesa.pareja2?.jugador2_id || null,
-      // Puntos por pareja
       puntos_pareja1: parseInt(puntosPareja1.value.PT) || 0,
       puntos_pareja2: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.PT) || 0 : null,
-      // Manos ganadas
       manos_ganadas_pareja1: parseInt(puntosPareja1.value.MG) || 0,
       manos_ganadas_pareja2: props.mesa.pareja2?.jugador1_id ? parseInt(puntosPareja2.value.MG) || 0 : null
     }
 
-    console.log('Guardando resultados para mesa incompleta:', {
-      esMesaIncompleta: esMesaIncompleta.value,
-      jugadoresActivos: jugadoresActivos.value,
-      datos
-    })
-
-    // Determinar si es una modificación o un nuevo registro
     const method = props.resultadoExistente ? 'PUT' : 'POST'
-    console.log(`Usando método ${method} para ${props.resultadoExistente ? 'modificar' : 'crear'} resultados`)
-
+    
     const response = await fetch('http://localhost:8000/api/resultados/mesa/', {
       method: method,
       headers: {
@@ -411,14 +445,9 @@ const guardarResultados = async () => {
 
     if (!response.ok) {
       const responseData = await response.json()
-      console.error('Error response:', responseData)
       throw new Error(responseData.detail || 'Error al guardar los resultados')
     }
 
-    const responseData = await response.json()
-    console.log('Respuesta del servidor:', responseData)
-    
-    // Emitir eventos para actualizar la vista principal
     emit('resultadoRegistrado', { mesa: datos.mesa, registrado: true })
     emit('close')
 
@@ -428,104 +457,60 @@ const guardarResultados = async () => {
   }
 }
 
-const limpiarCampos = () => {
-  puntosPareja1.value = { PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 }
-  puntosPareja2.value = { PT: 0, PV: 0, PC: 0, PG: 0, MG: 0 }
-}
+const validarPuntos = () => {
+  if (esMesaIncompleta.value) return true
 
-const cerrar = () => {
-  limpiarCampos()
-  emit('close')
-}
-
-// Añadir computed property para detectar si es una mesa incompleta
-const esUltimaMesaIncompleta = computed(() => {
-  return props.esUltimaMesa && (
-    !props.mesa.pareja2?.jugador1 || 
-    !props.mesa.pareja1?.jugador2 ||
-    !props.mesa.pareja2?.jugador2
-  )
-})
-
-const puntosAutomaticos = computed(() => {
-  if (!esMesaIncompleta.value || !campeonatoPM.value) return null
-  
-  const PT = Math.round(campeonatoPM.value / 2)
-  return {
-    PT: PT,
-    PV: PT,
-    PC: PT,
-    PG: 1,
-    MG: Math.floor(PT / 30)
+  if (puntosPareja1.value.PT < 0 || puntosPareja1.value.PT > campeonatoPM.value * 2 ||
+      (props.mesa.pareja2?.jugador1 && (puntosPareja2.value.PT < 0 || puntosPareja2.value.PT > campeonatoPM.value * 2))) {
+    alert('Los puntos totales deben estar entre 0 y ' + (campeonatoPM.value * 2))
+    return false
   }
-})
 
-// Modificar el watch del show para añadir logs
-watch(() => props.show, async (newVal) => {
-  console.log('Watch show activado:', {
-    newVal,
-    mesa: props.mesa,
-    campeonatoId: props.campeonatoId,
-    partidaActual: props.partidaActual,
-    resultadoExistente: props.resultadoExistente
-  })
+  if (puntosPareja1.value.MG < 0 || puntosPareja1.value.MG > 20 ||
+      (props.mesa.pareja2?.jugador1 && (puntosPareja2.value.MG < 0 || puntosPareja2.value.MG > 20))) {
+    alert('Las manos ganadas deben estar entre 0 y 20')
+    return false
+  }
+
+  const mesaCompleta = props.mesa.pareja1?.jugador1?.activo && 
+                      props.mesa.pareja1?.jugador2?.activo && 
+                      props.mesa.pareja2?.jugador1?.activo && 
+                      props.mesa.pareja2?.jugador2?.activo
   
+  if (mesaCompleta && puntosPareja1.value.PV === puntosPareja2.value.PV && 
+      puntosPareja1.value.PV !== 0) {
+    alert('Los PV no pueden ser iguales en una mesa completa')
+    return false
+  }
+
+  return true
+}
+
+watch(() => props.campeonatoId, obtenerPM, { immediate: true })
+
+watch(() => props.resultadoExistente, (newVal) => {
+  if (newVal) {
+    nextTick(() => {
+      cargarResultadoExistente()
+    })
+  }
+}, { immediate: true })
+
+watch(() => props.show, async (newVal) => {
   if (!newVal) {
     limpiarCampos()
     return
   }
 
-  // Asegurarse de que tenemos el PM del campeonato antes de continuar
   await obtenerPM()
   
-  // Si hay un resultado existente, cargarlo
   if (props.resultadoExistente) {
-    console.log('Cargando resultado existente:', props.resultadoExistente)
-    puntosPareja1.value = {
-      PT: props.resultadoExistente.puntos_pareja1,
-      MG: props.resultadoExistente.manos_ganadas_pareja1,
-      PV: Math.min(props.resultadoExistente.puntos_pareja1, campeonatoPM.value),
-      PG: props.resultadoExistente.puntos_pareja1 > 0 ? 1 : 0,
-      PC: props.resultadoExistente.puntos_pareja1
-    }
-    
-    if (props.resultadoExistente.puntos_pareja2 !== null) {
-      puntosPareja2.value = {
-        PT: props.resultadoExistente.puntos_pareja2,
-        MG: props.resultadoExistente.manos_ganadas_pareja2,
-        PV: Math.min(props.resultadoExistente.puntos_pareja2, campeonatoPM.value),
-        PG: props.resultadoExistente.puntos_pareja2 > 0 ? 1 : 0,
-        PC: props.resultadoExistente.puntos_pareja2
-      }
-    }
-    calcularPuntos(1)
-    calcularPuntos(2)
-  } 
-  // Si la mesa está incompleta y no hay resultado existente
-  else if (esMesaIncompleta.value) {
-    console.log('Mesa incompleta detectada, asignando puntos automáticos')
-    
-    const puntosAuto = puntosAutomaticos.value
-    if (!puntosAuto) {
-      console.error('No se pudieron calcular los puntos automáticos')
-      return
-    }
-    
-    console.log('Puntos automáticos calculados:', puntosAuto)
-    
-    // Asignar puntos automáticos a las parejas con jugadores activos
-    if (props.mesa.pareja1?.jugador1?.activo || props.mesa.pareja1?.jugador2?.activo) {
-      Object.assign(puntosPareja1.value, puntosAuto)
-      console.log('Puntos asignados a pareja 1:', puntosPareja1.value)
-    }
-    
-    if (props.mesa.pareja2?.jugador1?.activo || props.mesa.pareja2?.jugador2?.activo) {
-      Object.assign(puntosPareja2.value, puntosAuto)
-      console.log('Puntos asignados a pareja 2:', puntosPareja2.value)
-    }
+    await nextTick()
+    cargarResultadoExistente()
+  } else if (esMesaIncompleta.value) {
+    asignarPuntosAutomaticos()
   }
 
-  // Actualizar estado de los inputs
   nextTick(() => {
     const inputs = document.querySelectorAll('.pareja-resultados input')
     inputs.forEach(input => {
@@ -537,11 +522,6 @@ watch(() => props.show, async (newVal) => {
     })
   })
 }, { immediate: true })
-
-// Añadir computed property para verificar si hay jugadores activos en la pareja 2
-const tieneJugadoresActivosPareja2 = computed(() => {
-  return props.mesa.pareja2?.jugador1?.activo || props.mesa.pareja2?.jugador2?.activo
-})
 </script>
 
 <style scoped>

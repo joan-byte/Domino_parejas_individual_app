@@ -25,6 +25,79 @@ router = APIRouter(
     tags=["parejas-partida"]
 )
 
+def asignar_parejas_partida(db: Session, campeonato_id: int, partida: int, jugadores_ordenados: List[int], es_primera_partida: bool = False) -> List[ParejaPartida]:
+    """Función auxiliar que implementa la lógica de asignación de parejas.
+    
+    Args:
+        db: Sesión de base de datos
+        campeonato_id: ID del campeonato
+        partida: Número de partida
+        jugadores_ordenados: Lista de IDs de jugadores ya ordenados por ranking o ID
+        es_primera_partida: Si es True, realiza un sorteo aleatorio. Si es False, usa el orden por ranking
+    
+    Returns:
+        Lista de objetos ParejaPartida creados
+    """
+    # Para la primera partida, mezclar aleatoriamente los jugadores
+    if es_primera_partida:
+        random.shuffle(jugadores_ordenados)
+    
+    # Eliminar las parejas existentes de esta partida
+    db.query(ParejaPartida).filter(
+        ParejaPartida.campeonato_id == campeonato_id,
+        ParejaPartida.partida == partida
+    ).delete()
+    
+    parejas = []
+    num_jugadores = len(jugadores_ordenados)
+    print(f"Número total de jugadores a asignar: {num_jugadores}")
+    
+    # Crear las mesas y asignar parejas según el ranking
+    num_mesas = (num_jugadores + 3) // 4
+    
+    for mesa in range(num_mesas):
+        # Índices base para esta mesa
+        indice_base = mesa * 4
+        
+        # Pareja 1: jugador 1 y 3 de la mesa (según ranking)
+        jugador1_idx = indice_base
+        jugador2_idx = indice_base + 2
+        
+        # Crear primera pareja
+        pareja1 = ParejaPartida(
+            partida=partida,
+            mesa=mesa + 1,
+            jugador1_id=jugadores_ordenados[jugador1_idx] if jugador1_idx < num_jugadores else None,
+            jugador2_id=jugadores_ordenados[jugador2_idx] if jugador2_idx < num_jugadores else None,
+            numero_pareja=1,
+            campeonato_id=campeonato_id
+        )
+        db.add(pareja1)
+        parejas.append(pareja1)
+        
+        # Pareja 2: jugador 2 y 4 de la mesa (según ranking)
+        jugador3_idx = indice_base + 1
+        jugador4_idx = indice_base + 3
+        
+        # Crear segunda pareja
+        pareja2 = ParejaPartida(
+            partida=partida,
+            mesa=mesa + 1,
+            jugador1_id=jugadores_ordenados[jugador3_idx] if jugador3_idx < num_jugadores else None,
+            jugador2_id=jugadores_ordenados[jugador4_idx] if jugador4_idx < num_jugadores else None,
+            numero_pareja=2,
+            campeonato_id=campeonato_id
+        )
+        db.add(pareja2)
+        parejas.append(pareja2)
+        
+        print(f"Mesa {mesa + 1}:")
+        print(f"  Pareja 1: {jugadores_ordenados[jugador1_idx] if jugador1_idx < num_jugadores else None} - {jugadores_ordenados[jugador2_idx] if jugador2_idx < num_jugadores else None}")
+        print(f"  Pareja 2: {jugadores_ordenados[jugador3_idx] if jugador3_idx < num_jugadores else None} - {jugadores_ordenados[jugador4_idx] if jugador4_idx < num_jugadores else None}")
+    
+    db.commit()
+    return parejas
+
 @router.post("/sorteo-inicial/")
 async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(get_db)):
     """Realiza el sorteo inicial de parejas y mesas para la primera partida.
@@ -115,29 +188,15 @@ async def realizar_sorteo_inicial(sorteo: SorteoInicial, db: Session = Depends(g
 
 @router.post("/siguiente-partida/{campeonato_id}/{partida_actual}", response_model=SiguientePartidaResponse)
 def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db: Session = Depends(get_db)):
-    """Crea las parejas para la siguiente partida basándose en el ranking.
-    
-    La asignación sigue el siguiente patrón:
-    Mesa 1: Pareja 1 (1º y 3º) vs Pareja 2 (2º y 4º)
-    Mesa 2: Pareja 1 (5º y 7º) vs Pareja 2 (6º y 8º)
-    Mesa 3: Pareja 1 (9º y 11º) vs Pareja 2 (10º y 12º)
-    Y así sucesivamente...
-    """
+    """Crea las parejas para la siguiente partida basándose en el ranking."""
     try:
-        # Obtener la última partida asignada
-        ultima_partida = db.query(func.max(ParejaPartida.partida)).filter(
-            ParejaPartida.campeonato_id == campeonato_id
-        ).scalar()
-        
-        siguiente_partida = (ultima_partida + 1) if ultima_partida is not None else 1
-
         # Verificar que el campeonato existe
         campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
         if not campeonato:
             raise HTTPException(status_code=404, detail="Campeonato no encontrado")
         
-        # Obtener solo jugadores activos
-        jugadores_activos = db.query(Jugador.id).filter(
+        # Obtener TODOS los jugadores activos - esta es nuestra fuente de verdad
+        jugadores_activos = db.query(Jugador).filter(
             Jugador.campeonato_id == campeonato_id,
             Jugador.activo == True
         ).all()
@@ -145,75 +204,61 @@ def crear_parejas_siguiente_partida(campeonato_id: int, partida_actual: int, db:
         if not jugadores_activos:
             raise HTTPException(status_code=400, detail="No hay jugadores activos disponibles")
             
-        jugadores_activos_ids = [j[0] for j in jugadores_activos]
+        jugadores_activos_ids = [j.id for j in jugadores_activos]
         
-        # Obtener el ranking actual usando los criterios correctos
-        ranking = db.query(
-            Resultado.jugador_id,
-            func.sum(Resultado.PG).label('total_PG'),
-            func.sum(Resultado.PC).label('total_PC'),
-            func.sum(Resultado.PT).label('total_PT'),
-            func.sum(Resultado.MG).label('total_MG')
-        ).filter(
-            Resultado.campeonato_id == campeonato_id,
-            Resultado.partida < siguiente_partida,
-            Resultado.jugador_id.in_(jugadores_activos_ids)
-        ).group_by(
-            Resultado.jugador_id
-        ).order_by(
-            func.sum(Resultado.PG).desc(),
-            func.sum(Resultado.PC).desc(),
-            func.sum(Resultado.PT).desc(),
-            func.sum(Resultado.MG),
-            Resultado.jugador_id.asc()
-        ).all()
-
-        # Si no hay ranking, obtener jugadores en orden aleatorio
-        if not ranking:
-            jugadores_ordenados = [j[0] for j in jugadores_activos]
-            random.shuffle(jugadores_ordenados)
+        # Verificar si hay resultados registrados para determinar si es primera partida
+        hay_resultados = db.query(Resultado).filter(
+            Resultado.campeonato_id == campeonato_id
+        ).first() is not None
+        
+        es_primera_partida = not hay_resultados
+        
+        if es_primera_partida:
+            # Para la primera partida, usar los IDs de jugadores activos directamente
+            jugadores_ordenados = jugadores_activos_ids
         else:
+            # Para las siguientes partidas, ordenar los jugadores activos según el ranking
+            ranking = db.query(
+                Resultado.jugador_id,
+                func.sum(Resultado.PG).label('total_PG'),
+                func.sum(Resultado.PC).label('total_PC'),
+                func.sum(Resultado.PT).label('total_PT'),
+                func.sum(Resultado.MG).label('total_MG')
+            ).filter(
+                Resultado.campeonato_id == campeonato_id,
+                Resultado.jugador_id.in_(jugadores_activos_ids)  # Solo jugadores que están activos
+            ).group_by(
+                Resultado.jugador_id
+            ).order_by(
+                func.sum(Resultado.PG).desc(),  # Primero por PG descendente
+                func.sum(Resultado.PC).desc(),  # Segundo por PC descendente
+                func.sum(Resultado.PT).desc(),  # Tercero por PT descendente
+                func.sum(Resultado.MG),         # Cuarto por MG ascendente
+                Resultado.jugador_id.asc()      # Quinto por ID para desempate consistente
+            ).all()
+            
+            # Obtener los IDs de jugadores del ranking (que ya sabemos que están activos)
             jugadores_ordenados = [r[0] for r in ranking]
-
-        parejas = []
-        num_jugadores = len(jugadores_ordenados)
-        num_mesas = (num_jugadores + 3) // 4  # Redondear hacia arriba
+            
+            # Agregar cualquier jugador activo que no tenga resultados al final
+            jugadores_sin_ranking = [j_id for j_id in jugadores_activos_ids if j_id not in jugadores_ordenados]
+            jugadores_ordenados.extend(jugadores_sin_ranking)
+            
+        print(f"Jugadores activos totales: {len(jugadores_activos_ids)}")
+        print(f"Jugadores ordenados para asignación: {jugadores_ordenados}")
         
-        # Crear parejas para todas las mesas
-        for mesa in range(num_mesas):
-            indice_base = mesa * 4
-            
-            # Pareja 1: jugadores en posiciones base y base+2 (1º y 3º, 5º y 7º, etc.)
-            if indice_base < num_jugadores:
-                pareja1 = ParejaPartida(
-                    partida=siguiente_partida,
-                    mesa=mesa + 1,
-                    jugador1_id=jugadores_ordenados[indice_base],     # 1º, 5º, 9º...
-                    jugador2_id=jugadores_ordenados[indice_base + 2] if indice_base + 2 < num_jugadores else None,
-                    numero_pareja=1,
-                    campeonato_id=campeonato_id
-                )
-                db.add(pareja1)
-                parejas.append(pareja1)
-            
-            # Pareja 2: jugadores en posiciones base+1 y base+3 (2º y 4º, 6º y 8º, etc.)
-            if indice_base + 1 < num_jugadores:
-                pareja2 = ParejaPartida(
-                    partida=siguiente_partida,
-                    mesa=mesa + 1,
-                    jugador1_id=jugadores_ordenados[indice_base + 1], # 2º, 6º, 10º...
-                    jugador2_id=jugadores_ordenados[indice_base + 3] if indice_base + 3 < num_jugadores else None,
-                    numero_pareja=2,
-                    campeonato_id=campeonato_id
-                )
-                db.add(pareja2)
-                parejas.append(pareja2)
-
-        db.commit()
+        # Crear las parejas usando la función auxiliar
+        parejas = asignar_parejas_partida(
+            db, 
+            campeonato_id, 
+            partida_actual + 1,  # La siguiente partida
+            jugadores_ordenados, 
+            es_primera_partida=es_primera_partida
+        )
 
         return SiguientePartidaResponse(
             mensaje="Parejas creadas correctamente",
-            nueva_partida=siguiente_partida,
+            nueva_partida=partida_actual + 1,
             parejas=parejas
         )
 
@@ -254,9 +299,8 @@ def get_mesas_by_campeonato_partida(campeonato_id: int, partida: int, db: Sessio
             Resultado.partida == partida
         ).all()
         
-        # Crear un conjunto de mesas con resultados y jugadores con resultados
+        # Crear un conjunto de mesas con resultados
         mesas_con_resultados = {resultado.mesa for resultado in resultados}
-        jugadores_con_resultados = {(resultado.mesa, resultado.jugador_id) for resultado in resultados}
         
         # Obtener todas las parejas para este campeonato y partida
         parejas = db.query(ParejaPartida).filter(
@@ -267,46 +311,9 @@ def get_mesas_by_campeonato_partida(campeonato_id: int, partida: int, db: Sessio
             ParejaPartida.numero_pareja
         ).all()
         
-        # Filtrar parejas según los resultados y estado de los jugadores
-        parejas_filtradas = []
-        for pareja in parejas:
-            # Si la mesa ya tiene resultados, incluir la pareja completa
-            if pareja.mesa in mesas_con_resultados:
-                parejas_filtradas.append(pareja)
-                continue
-            
-            # Si no hay resultados, verificar cada jugador
-            pareja_modificada = ParejaPartida(
-                id=pareja.id,
-                campeonato_id=pareja.campeonato_id,
-                partida=pareja.partida,
-                mesa=pareja.mesa,
-                numero_pareja=pareja.numero_pareja
-            )
-            
-            # Verificar jugador1
-            if pareja.jugador1 and pareja.jugador1.activo:
-                pareja_modificada.jugador1_id = pareja.jugador1_id
-                pareja_modificada.jugador1 = pareja.jugador1
-            else:
-                pareja_modificada.jugador1_id = None
-                pareja_modificada.jugador1 = None
-            
-            # Verificar jugador2
-            if pareja.jugador2 and pareja.jugador2.activo:
-                pareja_modificada.jugador2_id = pareja.jugador2_id
-                pareja_modificada.jugador2 = pareja.jugador2
-            else:
-                pareja_modificada.jugador2_id = None
-                pareja_modificada.jugador2 = None
-            
-            # Solo incluir la pareja si al menos tiene un jugador activo
-            if pareja_modificada.jugador1_id is not None or pareja_modificada.jugador2_id is not None:
-                parejas_filtradas.append(pareja_modificada)
-        
-        # Agrupar parejas por mesa
+        # Agrupar parejas por mesa sin filtrar
         mesas_dict = {}
-        for pareja in parejas_filtradas:
+        for pareja in parejas:
             if pareja.mesa not in mesas_dict:
                 mesas_dict[pareja.mesa] = {
                     "numeroMesa": pareja.mesa,
@@ -314,10 +321,28 @@ def get_mesas_by_campeonato_partida(campeonato_id: int, partida: int, db: Sessio
                     "pareja2": None
                 }
             
+            # Crear una copia de la pareja para no modificar la original
+            pareja_modificada = ParejaPartida(
+                id=pareja.id,
+                campeonato_id=pareja.campeonato_id,
+                partida=pareja.partida,
+                mesa=pareja.mesa,
+                numero_pareja=pareja.numero_pareja,
+                jugador1_id=pareja.jugador1_id,
+                jugador2_id=pareja.jugador2_id
+            )
+            
+            # Asignar los jugadores
+            if pareja.jugador1_id:
+                pareja_modificada.jugador1 = pareja.jugador1
+            if pareja.jugador2_id:
+                pareja_modificada.jugador2 = pareja.jugador2
+            
+            # Asignar la pareja a la mesa correspondiente
             if pareja.numero_pareja == 1:
-                mesas_dict[pareja.mesa]["pareja1"] = pareja
-            elif pareja.numero_pareja == 2:
-                mesas_dict[pareja.mesa]["pareja2"] = pareja
+                mesas_dict[pareja.mesa]["pareja1"] = pareja_modificada
+            else:
+                mesas_dict[pareja.mesa]["pareja2"] = pareja_modificada
         
         # Convertir el diccionario a una lista ordenada por número de mesa
         mesas = [mesas_dict[mesa_num] for mesa_num in sorted(mesas_dict.keys())]
@@ -501,130 +526,81 @@ async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends
 
 @router.post("/corregir-asignacion/{campeonato_id}/{partida}", response_model=List[ParejaPartidaSchema])
 def corregir_asignacion_parejas(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
-    """Corrige la asignación de parejas de una partida específica según el ranking.
-    
-    La asignación sigue el siguiente patrón:
-    Mesa 1: Pareja 1 (1º y 3º) vs Pareja 2 (2º y 4º)
-    Mesa 2: Pareja 1 (5º y 7º) vs Pareja 2 (6º y 8º)
-    Mesa 3: Pareja 1 (9º y 11º) vs Pareja 2 (10º y 12º)
-    Y así sucesivamente...
-    
-    El orden de clasificación es:
-    1. Suma de PG (Partidas Ganadas) descendente
-    2. Suma de PC (Puntos Conseguidos) descendente
-    3. Suma de PT (Puntos Totales) descendente
-    4. Suma de MG (Manos Ganadas) ascendente
-    """
-    # Verificar si hay resultados registrados para esta partida
-    resultados_existentes = db.query(Resultado).filter(
-        Resultado.campeonato_id == campeonato_id,
-        Resultado.partida == partida
-    ).first()
-    
-    if resultados_existentes:
-        raise HTTPException(
-            status_code=400, 
-            detail="No se puede corregir la asignación porque ya hay resultados registrados para esta partida"
-        )
-    
-    # Calcular el ranking hasta la partida anterior usando los criterios correctos
-    ranking_query = db.query(
-        Resultado.jugador_id,
-        func.sum(Resultado.PG).label('total_PG'),
-        func.sum(Resultado.PC).label('total_PC'),
-        func.sum(Resultado.PT).label('total_PT'),
-        func.sum(Resultado.MG).label('total_MG')
-    ).filter(
-        Resultado.campeonato_id == campeonato_id,
-        Resultado.partida < partida,  # Solo considerar partidas anteriores
-        Resultado.jugador_id.in_(  # Solo considerar jugadores activos
-            db.query(Jugador.id).filter(
+    """Corrige la asignación de parejas de una partida específica según el ranking."""
+    try:
+        # Verificar si hay resultados registrados para esta partida
+        resultados_existentes = db.query(Resultado).filter(
+            Resultado.campeonato_id == campeonato_id,
+            Resultado.partida == partida
+        ).first()
+        
+        if resultados_existentes:
+            raise HTTPException(
+                status_code=400, 
+                detail="No se puede corregir la asignación porque ya hay resultados registrados para esta partida"
+            )
+        
+        # Verificar si es la primera partida (no hay resultados previos)
+        es_primera_partida = partida == 1
+        
+        if es_primera_partida:
+            # Para la primera partida, ordenar por ID y dejar que la función de asignación los mezcle
+            jugadores_ordenados = [j.id for j in db.query(Jugador).filter(
                 Jugador.campeonato_id == campeonato_id,
                 Jugador.activo == True
+            ).order_by(Jugador.id).all()]
+        else:
+            # Para las siguientes partidas, usar el ranking
+            ranking_query = db.query(
+                Resultado.jugador_id,
+                func.sum(Resultado.PG).label('total_PG'),
+                func.sum(Resultado.PC).label('total_PC'),
+                func.sum(Resultado.PT).label('total_PT'),
+                func.sum(Resultado.MG).label('total_MG')
+            ).filter(
+                Resultado.campeonato_id == campeonato_id,
+                Resultado.partida < partida,
+                Resultado.jugador_id.in_(
+                    db.query(Jugador.id).filter(
+                        Jugador.campeonato_id == campeonato_id,
+                        Jugador.activo == True
+                    )
+                )
+            ).group_by(
+                Resultado.jugador_id
+            ).order_by(
+                func.sum(Resultado.PG).desc(),
+                func.sum(Resultado.PC).desc(),
+                func.sum(Resultado.PT).desc(),
+                func.sum(Resultado.MG),
+                Resultado.jugador_id.asc()
             )
-        )
-    ).group_by(
-        Resultado.jugador_id
-    ).order_by(
-        func.sum(Resultado.PG).desc(),  # 1º criterio: PG descendente
-        func.sum(Resultado.PC).desc(),  # 2º criterio: PC descendente
-        func.sum(Resultado.PT).desc(),  # 3º criterio: PT descendente
-        func.sum(Resultado.MG),         # 4º criterio: MG ascendente
-        Resultado.jugador_id.asc()      # 5º criterio: ID del jugador ascendente para desempate
-    )
-    
-    # Obtener los resultados completos para poder verificar empates
-    ranking_results = ranking_query.all()
-    
-    # Si es la primera partida o no hay ranking, obtener jugadores activos ordenados por ID
-    if not ranking_results:
-        jugadores_ordenados = [j.id for j in db.query(Jugador).filter(
-            Jugador.campeonato_id == campeonato_id,
-            Jugador.activo == True
-        ).order_by(Jugador.id).all()]
-    else:
-        # Extraer los IDs de los jugadores en el orden correcto
-        jugadores_ordenados = [r[0] for r in ranking_results]
-    
-    if not jugadores_ordenados:
-        raise HTTPException(status_code=404, detail="No se encontraron jugadores activos para realizar la asignación")
-    
-    # Eliminar las parejas existentes de esta partida
-    db.query(ParejaPartida).filter(
-        ParejaPartida.campeonato_id == campeonato_id,
-        ParejaPartida.partida == partida
-    ).delete()
-    
-    parejas = []
-    num_jugadores = len(jugadores_ordenados)
-    num_mesas = (num_jugadores + 3) // 4  # Redondear hacia arriba para incluir la última mesa
-    
-    # Crear todas las parejas siguiendo el mismo patrón para todas las mesas
-    for mesa in range(num_mesas):
-        indice_base = mesa * 4
+            
+            ranking_results = ranking_query.all()
+            jugadores_ordenados = [r[0] for r in ranking_results]
         
-        # Pareja 1: jugadores en posiciones base y base+2 (1º y 3º, 5º y 7º, etc.)
-        pareja1 = ParejaPartida(
-            partida=partida,
-            mesa=mesa + 1,
-            jugador1_id=jugadores_ordenados[indice_base],     # 1º, 5º, 9º...
-            jugador2_id=jugadores_ordenados[indice_base + 2] if indice_base + 2 < num_jugadores else None,
-            numero_pareja=1,
-            campeonato_id=campeonato_id
+        if not jugadores_ordenados:
+            raise HTTPException(status_code=404, detail="No se encontraron jugadores activos para realizar la asignación")
+            
+        # Crear las parejas usando la función auxiliar
+        parejas = asignar_parejas_partida(
+            db, 
+            campeonato_id, 
+            partida, 
+            jugadores_ordenados, 
+            es_primera_partida=es_primera_partida
         )
-        db.add(pareja1)
-        parejas.append(pareja1)
         
-        # Solo crear pareja 2 si hay al menos un jugador más disponible
-        if indice_base + 1 < num_jugadores:
-            pareja2 = ParejaPartida(
-                partida=partida,
-                mesa=mesa + 1,
-                jugador1_id=jugadores_ordenados[indice_base + 1],  # 2º, 6º, 10º...
-                jugador2_id=jugadores_ordenados[indice_base + 3] if indice_base + 3 < num_jugadores else None,
-                numero_pareja=2,
-                campeonato_id=campeonato_id
-            )
-            db.add(pareja2)
-            parejas.append(pareja2)
-    
-    db.commit()
-    
-    # Obtener todas las parejas creadas con la información de los jugadores
-    parejas = db.query(ParejaPartida).filter(
-        ParejaPartida.campeonato_id == campeonato_id,
-        ParejaPartida.partida == partida
-    ).order_by(
-        ParejaPartida.mesa,
-        ParejaPartida.numero_pareja
-    ).all()
-    
-    # Cargar la información de los jugadores
-    for pareja in parejas:
-        pareja.jugador1 = db.query(Jugador).filter(Jugador.id == pareja.jugador1_id).first()
-        pareja.jugador2 = db.query(Jugador).filter(Jugador.id == pareja.jugador2_id).first()
-    
-    return parejas 
+        # Cargar la información de los jugadores
+        for pareja in parejas:
+            pareja.jugador1 = db.query(Jugador).filter(Jugador.id == pareja.jugador1_id).first()
+            pareja.jugador2 = db.query(Jugador).filter(Jugador.id == pareja.jugador2_id).first()
+        
+        return parejas
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/corregir-estado-campeonato/{campeonato_id}")
 async def corregir_estado_campeonato(campeonato_id: int, db: Session = Depends(get_db)):

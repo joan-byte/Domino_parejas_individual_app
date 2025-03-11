@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.routes import jugador, campeonato, pareja_partida, resultado, mesa
+from app.routes import jugador, campeonato, pareja_partida, resultado, mesa, partida
 import uvicorn
 import os
 from dotenv import load_dotenv
@@ -77,6 +77,7 @@ app.include_router(campeonato.router, prefix="/api", tags=["campeonatos"])
 app.include_router(pareja_partida.router, prefix="/api", tags=["parejas_partida"])
 app.include_router(resultado.router, prefix="/api", tags=["resultados"])
 app.include_router(mesa.router, prefix="/api", tags=["mesas"])
+app.include_router(partida.router, prefix="/api", tags=["partidas"])
 
 @app.get("/")
 async def root():

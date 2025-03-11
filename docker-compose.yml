@@ -7,15 +7,17 @@ services:
     image: postgres:15-alpine
     platform: ${TARGETPLATFORM:-linux/amd64}
     environment:
-      POSTGRES_USER: individual
+      POSTGRES_USER_FILE: /run/secrets/postgres_user
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      POSTGRES_DB: domino_parejas_individualdb
+      POSTGRES_DB_FILE: /run/secrets/postgres_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     secrets:
+      - postgres_user
       - postgres_password
+      - postgres_db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U individual -d domino_parejas_individualdb"]
+      test: ["CMD-SHELL", "pg_isready -U $$(cat /run/secrets/postgres_user) -d $$(cat /run/secrets/postgres_db)"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -23,7 +25,13 @@ services:
 
   app:
     container_name: domino_parejas_individual_app
-    image: joanalba/domino_parejas_individual:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILDPLATFORM: ${BUILDPLATFORM:-linux/amd64}
+        TARGETPLATFORM: ${TARGETPLATFORM:-linux/amd64}
+    image: domino_parejas_individual_local:latest
     platform: ${TARGETPLATFORM:-linux/amd64}
     ports:
       - "80:80"
@@ -31,9 +39,9 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: domino_parejas_individualdb
-      DB_USER: individual
+      DB_USER_FILE: /run/secrets/postgres_user
       DB_PASS_FILE: /run/secrets/postgres_password
+      DB_NAME_FILE: /run/secrets/postgres_db
       SECRET_KEY_FILE: /run/secrets/secret_key
     depends_on:
       postgres:
@@ -42,6 +50,7 @@ services:
       - postgres_user
       - postgres_password
       - postgres_db
+      - secret_key
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s
@@ -51,6 +60,7 @@ services:
 
 volumes:
   postgres_data:
+    name: domino_parejas_individual_db_data
 
 secrets:
   postgres_user:

@@ -124,26 +124,57 @@ async def get_jugadores_by_campeonato(campeonato_id: int, db: Session = Depends(
 @router.put("/{jugador_id}/toggle-activo", response_model=JugadorResponse)
 async def toggle_jugador_activo(jugador_id: int, db: Session = Depends(get_db)):
     """Cambiar el estado activo/inactivo de un jugador"""
-    jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
+    # Obtener el jugador incluyendo el campeonato_id
+    jugador = db.query(Jugador).filter(
+        Jugador.id == jugador_id
+    ).first()
+    
     if not jugador:
         raise HTTPException(status_code=404, detail="Jugador no encontrado")
     
     try:
-        jugador.activo = not jugador.activo
-        db.flush()  # Asegurar que se actualice el estado
-        db.refresh(jugador)  # Recargar el objeto para verificar el cambio
+        estado_anterior = jugador.activo
+        jugador.activo = not estado_anterior
         
-        if jugador.activo != (not jugador.activo):  # Verificar que el cambio se aplicó
+        # Verificar si hay resultados o parejas asociadas antes de desactivar
+        if not jugador.activo:
+            # Verificar si el jugador está en alguna pareja
+            parejas = db.query(ParejaPartida).filter(
+                or_(
+                    and_(
+                        ParejaPartida.jugador1_id == jugador_id,
+                        ParejaPartida.campeonato_id == jugador.campeonato_id
+                    ),
+                    and_(
+                        ParejaPartida.jugador2_id == jugador_id,
+                        ParejaPartida.campeonato_id == jugador.campeonato_id
+                    )
+                )
+            ).first()
+            
+            if parejas:
+                db.rollback()
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se puede desactivar el jugador porque está asignado a una pareja"
+                )
+        
+        db.commit()
+        db.refresh(jugador)
+        
+        # Verificar que el cambio se aplicó correctamente
+        if jugador.activo == estado_anterior:
             db.rollback()
             raise HTTPException(
                 status_code=500,
                 detail="Error al cambiar el estado del jugador: el cambio no se guardó correctamente"
             )
         
-        db.commit()
         return jugador
     except Exception as e:
         db.rollback()
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/activos/campeonato/{campeonato_id}", response_model=List[JugadorResponse])

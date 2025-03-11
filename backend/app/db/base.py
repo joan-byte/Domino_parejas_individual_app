@@ -33,7 +33,20 @@ DB_NAME = get_env_value("DB_NAME", "domino_parejas_individualdb")
 DB_USER = get_env_value("DB_USER", "individual")
 DB_PASS = get_env_value("DB_PASS", "375CheyTac")
 
+# Intentar leer desde los archivos de secrets primero
+try:
+    with open('/run/secrets/postgres_user', 'r') as f:
+        DB_USER = f.read().strip()
+    with open('/run/secrets/postgres_password', 'r') as f:
+        DB_PASS = f.read().strip()
+    with open('/run/secrets/postgres_db', 'r') as f:
+        DB_NAME = f.read().strip()
+except Exception as e:
+    print(f"Warning: Could not read from secrets files: {e}")
+    # Mantener los valores por defecto si no se pueden leer los secrets
+
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+print(f"Connecting to database with URL: {DATABASE_URL}")
 
 # Crear el motor de la base de datos
 engine = create_engine(

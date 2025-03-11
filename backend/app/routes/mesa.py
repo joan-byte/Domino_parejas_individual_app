@@ -3,7 +3,10 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.db.base import get_db
 from app.models.mesa import Mesa
+from app.models.resultado import Resultado
+from app.models.pareja_partida import ParejaPartida
 from app.schemas.mesa import MesaCreate, Mesa as MesaSchema
+from app.schemas.pareja_partida import MesaSchema as MesaParejaSchema
 
 router = APIRouter()
 
@@ -28,23 +31,3 @@ def create_mesa(mesa: MesaCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_mesa)
     return db_mesa
-
-@router.get("/mesas/", response_model=List[MesaSchema])
-def read_mesas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    mesas = db.query(Mesa).offset(skip).limit(limit).all()
-    return mesas
-
-@router.get("/mesas/{mesa_id}", response_model=MesaSchema)
-def read_mesa(mesa_id: int, db: Session = Depends(get_db)):
-    mesa = db.query(Mesa).filter(Mesa.id == mesa_id).first()
-    if mesa is None:
-        raise HTTPException(status_code=404, detail="Mesa no encontrada")
-    return mesa
-
-@router.get("/mesas/campeonato/{campeonato_id}/partida/{partida}", response_model=List[MesaSchema])
-def read_mesas_by_campeonato_partida(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
-    mesas = db.query(Mesa).filter(
-        Mesa.campeonato_id == campeonato_id,
-        Mesa.partida == partida
-    ).order_by(Mesa.numero_mesa).all()
-    return mesas 

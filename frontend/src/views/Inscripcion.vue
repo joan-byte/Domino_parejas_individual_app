@@ -197,18 +197,18 @@ const cargarJugadores = async () => {
 
 const toggleActivo = async (jugadorId) => {
   try {
+    // Obtener el campeonato del localStorage
+    const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+    const campeonato = campeonatoGuardado ? JSON.parse(campeonatoGuardado) : null
+    
+    if (!campeonato) {
+      throw new Error('No se encontró información del campeonato')
+    }
+
     // Si el jugador está activo, lo desactivamos
     const jugador = jugadores.value.find(j => j.id === jugadorId)
     if (jugador?.activo) {
-      // Obtener la partida actual del localStorage
-      const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
-      const campeonato = campeonatoGuardado ? JSON.parse(campeonatoGuardado) : null
-      const partidaActual = campeonato?.partida_actual || 1
-
-      console.log('Enviando datos:', {
-        partida_actual: partidaActual,
-        campeonato_id: parseInt(campeonatoId.value)
-      })
+      console.log('Desactivando jugador:', jugadorId, 'en campeonato:', campeonato.id, 'partida:', campeonato.partida_actual)
 
       // Llamar al endpoint de desactivación
       const response = await fetch(`http://localhost:8000/api/jugadores/${jugadorId}/desactivar-y-quitar`, {
@@ -217,31 +217,31 @@ const toggleActivo = async (jugadorId) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          partida_actual: partidaActual,
-          campeonato_id: parseInt(campeonatoId.value)
+          partida_actual: campeonato.partida_actual,
+          campeonato_id: campeonato.id
         })
       })
 
-      if (response.ok) {
-        const resultado = await response.json()
-        console.log('Respuesta del servidor:', resultado)
-        // Actualizar el estado en la lista local
-        jugador.activo = false
-        
-        // Disparar evento para actualizar otros componentes
-        window.dispatchEvent(new CustomEvent('jugador-desactivado', {
-          detail: { jugadorId, campeonatoId: campeonatoId.value }
-        }))
-
-        // Recargar la lista de jugadores para asegurar que tenemos el estado más reciente
-        await cargarJugadores()
-      } else {
+      if (!response.ok) {
         const error = await response.json()
-        console.error('Error del servidor:', error)
         throw new Error(error.detail || 'Error al desactivar el jugador')
       }
+
+      const resultado = await response.json()
+      console.log('Respuesta del servidor:', resultado)
+      
+      // Actualizar el estado en la lista local
+      jugador.activo = false
+      
+      // Disparar evento para actualizar otros componentes
+      window.dispatchEvent(new CustomEvent('jugador-desactivado', {
+        detail: { jugadorId, campeonatoId: campeonato.id }
+      }))
+
+      // Recargar la lista de jugadores para asegurar que tenemos el estado más reciente
+      await cargarJugadores()
     } else {
-      // Si el jugador está inactivo, lo activamos con el endpoint toggle-activo
+      // Si el jugador está inactivo, lo activamos
       const response = await fetch(`http://localhost:8000/api/jugadores/${jugadorId}/toggle-activo`, {
         method: 'PUT',
         headers: {
@@ -249,22 +249,21 @@ const toggleActivo = async (jugadorId) => {
         }
       })
 
-      if (response.ok) {
-        const jugadorActualizado = await response.json()
-        jugador.activo = jugadorActualizado.activo
-        
-        // Disparar evento para actualizar otros componentes
-        window.dispatchEvent(new CustomEvent('jugador-actualizado', {
-          detail: { jugadorId, campeonatoId: campeonatoId.value }
-        }))
-
-        // Recargar la lista de jugadores
-        await cargarJugadores()
-      } else {
+      if (!response.ok) {
         const error = await response.json()
-        console.error('Error del servidor:', error)
         throw new Error(error.detail || 'Error al activar el jugador')
       }
+
+      const jugadorActualizado = await response.json()
+      jugador.activo = jugadorActualizado.activo
+      
+      // Disparar evento para actualizar otros componentes
+      window.dispatchEvent(new CustomEvent('jugador-actualizado', {
+        detail: { jugadorId, campeonatoId: campeonato.id }
+      }))
+
+      // Recargar la lista de jugadores
+      await cargarJugadores()
     }
   } catch (error) {
     console.error('Error:', error)

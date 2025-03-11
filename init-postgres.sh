@@ -3,6 +3,17 @@
 # En producción, las variables de entorno ya están definidas en el Dockerfile
 # No es necesario leer desde archivos de secretos
 
+# Esperar a que los archivos de secrets estén disponibles
+while [ ! -f /run/secrets/postgres_user ] || [ ! -f /run/secrets/postgres_password ] || [ ! -f /run/secrets/postgres_db ]; do
+    echo "Esperando a que los secrets estén disponibles..."
+    sleep 1
+done
+
+# Leer los secrets
+DB_USER=$(cat /run/secrets/postgres_user)
+DB_PASS=$(cat /run/secrets/postgres_password)
+DB_NAME=$(cat /run/secrets/postgres_db)
+
 echo "Inicializando PostgreSQL con usuario: $DB_USER, base de datos: $DB_NAME"
 
 # Iniciar PostgreSQL temporalmente para crear usuario y base de datos
