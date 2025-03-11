@@ -154,8 +154,11 @@ const loadRanking = async () => {
     const campeonato = await campeonatoResponse.json()
     tournamentName.value = campeonato.nombre
     
+    // Si el campeonato está finalizado, usamos el número total de partidas
+    const partidaParaRanking = campeonato.finalizado ? campeonato.numero_partidas : campeonato.partida_actual
+    
     // Obtener el ranking final del campeonato
-    const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId}`)
+    const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId}?partida=${partidaParaRanking}`)
     if (!rankingResponse.ok) {
       throw new Error(`Error al obtener ranking: ${rankingResponse.status}`)
     }

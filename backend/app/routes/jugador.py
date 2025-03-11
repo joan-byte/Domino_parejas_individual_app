@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from typing import List
 from app.db.base import get_db
 from app.models.jugador import Jugador
@@ -123,105 +123,74 @@ async def get_jugadores_by_campeonato(campeonato_id: int, db: Session = Depends(
 
 @router.put("/{jugador_id}/toggle-activo", response_model=JugadorResponse)
 async def toggle_jugador_activo(jugador_id: int, db: Session = Depends(get_db)):
+    """Cambiar el estado activo/inactivo de un jugador"""
     jugador = db.query(Jugador).filter(Jugador.id == jugador_id).first()
     if not jugador:
         raise HTTPException(status_code=404, detail="Jugador no encontrado")
     
-    jugador.activo = not jugador.activo
-    db.commit()
-    db.refresh(jugador)
-    return jugador
+    try:
+        jugador.activo = not jugador.activo
+        db.flush()  # Asegurar que se actualice el estado
+        db.refresh(jugador)  # Recargar el objeto para verificar el cambio
+        
+        if jugador.activo != (not jugador.activo):  # Verificar que el cambio se aplicó
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error al cambiar el estado del jugador: el cambio no se guardó correctamente"
+            )
+        
+        db.commit()
+        return jugador
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/activos/campeonato/{campeonato_id}", response_model=List[JugadorResponse])
+async def get_jugadores_activos_by_campeonato(campeonato_id: int, db: Session = Depends(get_db)):
+    """Obtener lista de jugadores activos de un campeonato específico"""
+    jugadores = db.query(Jugador).filter(
+        and_(
+            Jugador.campeonato_id == campeonato_id,
+            Jugador.activo == True
+        )
+    ).all()
+    return jugadores
 
 @router.put("/{jugador_id}/desactivar-y-quitar", response_model=dict)
-async def desactivar_y_quitar_jugador(jugador_id: int, partida_actual: int, campeonato_id: int, db: Session = Depends(get_db)):
-    """
-    Desactiva un jugador y lo quita de su pareja y mesa si no tiene resultados registrados
-    en la partida actual.
-    """
-    # Verificar si el jugador existe
-    jugador = db.query(Jugador).filter(Jugador.id == jugador_id, Jugador.campeonato_id == campeonato_id).first()
+async def desactivar_y_quitar_jugador(
+    jugador_id: int,
+    partida_actual: int = Body(...),
+    campeonato_id: int = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Desactivar un jugador y quitarlo de las asignaciones de mesa pendientes"""
+    # Verificar si el jugador existe y pertenece al campeonato
+    jugador = db.query(Jugador).filter(
+        and_(
+            Jugador.id == jugador_id,
+            Jugador.campeonato_id == campeonato_id
+        )
+    ).first()
+    
     if not jugador:
-        raise HTTPException(status_code=404, detail="Jugador no encontrado")
-    
-    # Verificar si el jugador tiene resultados en la partida actual
-    resultados = db.query(Resultado).filter(
-        Resultado.jugador_id == jugador_id,
-        Resultado.partida == partida_actual,
-        Resultado.campeonato_id == campeonato_id
-    ).first()
-    
-    if resultados:
-        # Si tiene resultados, solo desactivar
+        raise HTTPException(status_code=404, detail="Jugador no encontrado en este campeonato")
+
+    try:
+        # Desactivar el jugador
         jugador.activo = False
+        
+        # Commit el cambio
         db.commit()
         db.refresh(jugador)
+            
         return {
-            "mensaje": "El jugador ha sido desactivado pero no se ha quitado de su mesa porque ya tiene resultados registrados",
-            "solo_desactivado": True,
-            "jugador": jugador
+            "message": "Jugador desactivado correctamente",
+            "jugador_id": jugador_id,
+            "activo": False,
+            "campeonato_id": campeonato_id
         }
-    
-    # Si no tiene resultados, buscar la pareja a la que pertenece
-    pareja_como_jugador1 = db.query(ParejaPartida).filter(
-        ParejaPartida.jugador1_id == jugador_id,
-        ParejaPartida.partida == partida_actual,
-        ParejaPartida.campeonato_id == campeonato_id
-    ).first()
-    
-    pareja_como_jugador2 = db.query(ParejaPartida).filter(
-        ParejaPartida.jugador2_id == jugador_id,
-        ParejaPartida.partida == partida_actual,
-        ParejaPartida.campeonato_id == campeonato_id
-    ).first()
-    
-    pareja = pareja_como_jugador1 or pareja_como_jugador2
-    
-    if not pareja:
-        # Si no está en ninguna pareja, solo desactivar
-        jugador.activo = False
-        db.commit()
-        db.refresh(jugador)
-        return {
-            "mensaje": "El jugador ha sido desactivado (no estaba asignado a ninguna mesa)",
-            "solo_desactivado": True,
-            "jugador": jugador
-        }
-    
-    # Guardar información de la mesa y pareja
-    mesa_num = pareja.mesa
-    pareja_num = pareja.numero_pareja
-    
-    # Independientemente de si es jugador1 o jugador2, lo quitamos de la pareja
-    if pareja_como_jugador1:
-        # Si es jugador1, simplemente establecemos jugador1_id a NULL
-        # Nota: Esto podría requerir modificar la restricción NOT NULL en la base de datos
-        # Como alternativa, si jugador1_id no puede ser NULL, eliminamos la pareja
-        if pareja.jugador2_id:
-            # Si hay un jugador2, lo movemos a la posición de jugador1
-            pareja.jugador1_id = pareja.jugador2_id
-            pareja.jugador2_id = None
-        else:
-            # Si no hay jugador2 y estamos quitando jugador1, la pareja quedaría vacía
-            # En este caso, eliminamos la pareja
-            db.delete(pareja)
-    elif pareja_como_jugador2:
-        # Si es jugador2, simplemente lo establecemos a NULL
-        pareja.jugador2_id = None
-    
-    # Desactivar al jugador
-    jugador.activo = False
-    
-    db.commit()
-    
-    # Si la pareja no fue eliminada, refrescarla
-    if not (pareja_como_jugador1 and pareja.jugador2_id is None):
-        db.refresh(pareja)
-    
-    return {
-        "mensaje": f"El jugador ha sido desactivado y quitado de la mesa {mesa_num}, pareja {pareja_num}",
-        "solo_desactivado": False,
-        "jugador": jugador,
-        "mesa": mesa_num,
-        "pareja": pareja_num
-    }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     

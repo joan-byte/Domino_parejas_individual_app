@@ -132,7 +132,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, computed } from 'vue'
+import { reactive, ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
@@ -162,28 +162,34 @@ const cargarJugadores = async () => {
   if (!campeonatoId.value) return
 
   try {
+    // Obtener todos los jugadores del campeonato
     const response = await fetch(`http://localhost:8000/api/jugadores/campeonato/${campeonatoId.value}`)
-    if (response.ok) {
-      const nuevosJugadores = await response.json()
-      // Ordenar jugadores por ID de forma descendente
-      nuevosJugadores.sort((a, b) => b.id - a.id)
-      
-      // Mantener el estado de los jugadores existentes
-      if (jugadores.value.length > 0) {
-        const jugadoresActualizados = nuevosJugadores.map(nuevoJugador => {
-          const jugadorExistente = jugadores.value.find(j => j.id === nuevoJugador.id)
-          if (jugadorExistente) {
-            return { ...nuevoJugador, activo: jugadorExistente.activo }
-          }
-          return nuevoJugador
-        })
-        jugadores.value = jugadoresActualizados
-      } else {
-        jugadores.value = nuevosJugadores
-      }
-    } else {
+    if (!response.ok) {
       console.error('Error al cargar jugadores')
+      return
     }
+    
+    // Obtener jugadores activos
+    const responseActivos = await fetch(`http://localhost:8000/api/jugadores/activos/campeonato/${campeonatoId.value}`)
+    if (!responseActivos.ok) {
+      console.error('Error al cargar jugadores activos')
+      return
+    }
+
+    const nuevosJugadores = await response.json()
+    const jugadoresActivos = await responseActivos.json()
+    const jugadoresActivosIds = new Set(jugadoresActivos.map(j => j.id))
+
+    // Ordenar jugadores por ID de forma descendente y marcar su estado activo
+    const jugadoresOrdenados = nuevosJugadores
+      .map(jugador => ({
+        ...jugador,
+        activo: jugadoresActivosIds.has(jugador.id)
+      }))
+      .sort((a, b) => b.id - a.id)
+
+    jugadores.value = jugadoresOrdenados
+    console.log('Jugadores cargados:', jugadores.value)
   } catch (error) {
     console.error('Error:', error)
   }
@@ -191,26 +197,78 @@ const cargarJugadores = async () => {
 
 const toggleActivo = async (jugadorId) => {
   try {
-    const response = await fetch(`http://localhost:8000/api/jugadores/${jugadorId}/toggle-activo`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    })
+    // Si el jugador está activo, lo desactivamos
+    const jugador = jugadores.value.find(j => j.id === jugadorId)
+    if (jugador?.activo) {
+      // Obtener la partida actual del localStorage
+      const campeonatoGuardado = localStorage.getItem('campeonatoSeleccionado')
+      const campeonato = campeonatoGuardado ? JSON.parse(campeonatoGuardado) : null
+      const partidaActual = campeonato?.partida_actual || 1
 
-    if (response.ok) {
-      const jugadorActualizado = await response.json()
-      // Actualizar el estado en la lista local
-      const jugador = jugadores.value.find(j => j.id === jugadorId)
-      if (jugador) {
-        jugador.activo = jugadorActualizado.activo
+      console.log('Enviando datos:', {
+        partida_actual: partidaActual,
+        campeonato_id: parseInt(campeonatoId.value)
+      })
+
+      // Llamar al endpoint de desactivación
+      const response = await fetch(`http://localhost:8000/api/jugadores/${jugadorId}/desactivar-y-quitar`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          partida_actual: partidaActual,
+          campeonato_id: parseInt(campeonatoId.value)
+        })
+      })
+
+      if (response.ok) {
+        const resultado = await response.json()
+        console.log('Respuesta del servidor:', resultado)
+        // Actualizar el estado en la lista local
+        jugador.activo = false
+        
+        // Disparar evento para actualizar otros componentes
+        window.dispatchEvent(new CustomEvent('jugador-desactivado', {
+          detail: { jugadorId, campeonatoId: campeonatoId.value }
+        }))
+
+        // Recargar la lista de jugadores para asegurar que tenemos el estado más reciente
+        await cargarJugadores()
+      } else {
+        const error = await response.json()
+        console.error('Error del servidor:', error)
+        throw new Error(error.detail || 'Error al desactivar el jugador')
       }
     } else {
-      alert('Error al cambiar el estado del jugador')
+      // Si el jugador está inactivo, lo activamos con el endpoint toggle-activo
+      const response = await fetch(`http://localhost:8000/api/jugadores/${jugadorId}/toggle-activo`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (response.ok) {
+        const jugadorActualizado = await response.json()
+        jugador.activo = jugadorActualizado.activo
+        
+        // Disparar evento para actualizar otros componentes
+        window.dispatchEvent(new CustomEvent('jugador-actualizado', {
+          detail: { jugadorId, campeonatoId: campeonatoId.value }
+        }))
+
+        // Recargar la lista de jugadores
+        await cargarJugadores()
+      } else {
+        const error = await response.json()
+        console.error('Error del servidor:', error)
+        throw new Error(error.detail || 'Error al activar el jugador')
+      }
     }
   } catch (error) {
     console.error('Error:', error)
-    alert('Error al cambiar el estado del jugador')
+    alert(error.message || 'Error al cambiar el estado del jugador')
   }
 }
 
@@ -427,9 +485,18 @@ onMounted(async () => {
     return
   }
 
-  await verificarSorteoYResultados()
+  // Cargar jugadores antes de verificar sorteo y resultados
   await cargarJugadores()
+  await verificarSorteoYResultados()
   focusNombreInput()
+
+  // Añadir listener para recargar jugadores cuando se desactive uno
+  window.addEventListener('jugador-desactivado', cargarJugadores)
+})
+
+onUnmounted(() => {
+  // Limpiar el listener al desmontar el componente
+  window.removeEventListener('jugador-desactivado', cargarJugadores)
 })
 </script>
 

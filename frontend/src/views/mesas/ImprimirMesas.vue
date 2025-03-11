@@ -346,14 +346,14 @@ const cargarMesas = async () => {
     mensajeCarga.value = 'Cargando datos de mesas y ranking...'
     console.log('Cargando mesas para partida:', partidaActual.value)
     
-    // Obtener las parejas
-    const response = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId}/partida/${partidaActual.value}`)
+    // Obtener las parejas usando el endpoint correcto
+    const response = await fetch(`http://localhost:8000/api/parejas-partida/mesas/${campeonatoId}/${partidaActual.value}`)
     if (!response.ok) {
       throw new Error('Error al cargar las parejas')
     }
     
-    const parejasData = await response.json()
-    console.log('Parejas recibidas:', parejasData.length)
+    const mesasData = await response.json()
+    console.log('Mesas recibidas:', mesasData)
     
     // Obtener el ranking actualizado
     const rankingResponse = await fetch(`http://localhost:8000/api/resultados/ranking/campeonato/${campeonatoId}`)
@@ -367,22 +367,45 @@ const cargarMesas = async () => {
     // Crear un mapa para acceso rápido a los datos del ranking
     const rankingMap = new Map(rankingData.map(r => [r.jugador_id, r]))
     
-    // Actualizar los datos de las parejas con la información del ranking
-    parejas.value = parejasData.map(pareja => ({
-      ...pareja,
-      jugador1: {
-        ...pareja.jugador1,
-        PG: rankingMap.get(pareja.jugador1_id)?.PG || 0,
-        PC: rankingMap.get(pareja.jugador1_id)?.PC || 0,
-        posicion: rankingData.findIndex(r => r.jugador_id === pareja.jugador1_id) + 1
-      },
-      jugador2: pareja.jugador2 ? {
-        ...pareja.jugador2,
-        PG: rankingMap.get(pareja.jugador2_id)?.PG || 0,
-        PC: rankingMap.get(pareja.jugador2_id)?.PC || 0,
-        posicion: rankingData.findIndex(r => r.jugador_id === pareja.jugador2_id) + 1
-      } : null
-    }))
+    // Procesar las mesas y actualizar las parejas con la información del ranking
+    parejas.value = mesasData.flatMap(mesa => {
+      const parejasMesa = []
+      if (mesa.pareja1) {
+        parejasMesa.push({
+          ...mesa.pareja1,
+          jugador1: mesa.pareja1.jugador1 ? {
+            ...mesa.pareja1.jugador1,
+            PG: rankingMap.get(mesa.pareja1.jugador1_id)?.PG || 0,
+            PC: rankingMap.get(mesa.pareja1.jugador1_id)?.PC || 0,
+            posicion: rankingData.findIndex(r => r.jugador_id === mesa.pareja1.jugador1_id) + 1
+          } : null,
+          jugador2: mesa.pareja1.jugador2 ? {
+            ...mesa.pareja1.jugador2,
+            PG: rankingMap.get(mesa.pareja1.jugador2_id)?.PG || 0,
+            PC: rankingMap.get(mesa.pareja1.jugador2_id)?.PC || 0,
+            posicion: rankingData.findIndex(r => r.jugador_id === mesa.pareja1.jugador2_id) + 1
+          } : null
+        })
+      }
+      if (mesa.pareja2) {
+        parejasMesa.push({
+          ...mesa.pareja2,
+          jugador1: mesa.pareja2.jugador1 ? {
+            ...mesa.pareja2.jugador1,
+            PG: rankingMap.get(mesa.pareja2.jugador1_id)?.PG || 0,
+            PC: rankingMap.get(mesa.pareja2.jugador1_id)?.PC || 0,
+            posicion: rankingData.findIndex(r => r.jugador_id === mesa.pareja2.jugador1_id) + 1
+          } : null,
+          jugador2: mesa.pareja2.jugador2 ? {
+            ...mesa.pareja2.jugador2,
+            PG: rankingMap.get(mesa.pareja2.jugador2_id)?.PG || 0,
+            PC: rankingMap.get(mesa.pareja2.jugador2_id)?.PC || 0,
+            posicion: rankingData.findIndex(r => r.jugador_id === mesa.pareja2.jugador2_id) + 1
+          } : null
+        })
+      }
+      return parejasMesa
+    })
     
     cargando.value = false
     error.value = false

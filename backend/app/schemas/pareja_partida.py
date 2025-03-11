@@ -11,7 +11,7 @@ class ParejaNueva(BaseModel):
 class ParejaPartidaBase(BaseModel):
     partida: int
     mesa: int
-    jugador1_id: int
+    jugador1_id: Optional[int] = None
     jugador2_id: Optional[int] = None
     numero_pareja: int  # 1 o 2
     campeonato_id: int
@@ -38,6 +38,7 @@ class SorteoInicial(BaseModel):
 class SiguientePartidaResponse(BaseModel):
     mensaje: str
     nueva_partida: int
+    parejas: Optional[List[ParejaPartidaSchema]] = None
 
 class JugadorAsignadoSchema(BaseModel):
     id: int

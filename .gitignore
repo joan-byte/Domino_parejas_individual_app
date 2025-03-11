@@ -49,3 +49,23 @@ backend/scripts/
 # Archivos de backup e importación
 backend/jugadores_backup.json
 backend/importar_jugadores.py
+
+# Secretos y configuraciones
+*.env
+*.env.*
+.env.local
+.env.*.local
+config.json
+secrets.json
+credentials.json
+*_key.json
+*_keys.json
+.secret*
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.keystore
+*.jks

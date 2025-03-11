@@ -34,7 +34,7 @@ def get_mesas_registradas(campeonato_id: int, partida: int, db: Session = Depend
     todas_registradas = True
     if mesas:
         for mesa in mesas:
-            if mesa.numero not in mesas_registradas:
+            if mesa.numero_mesa not in mesas_registradas:
                 todas_registradas = False
                 break
     else:

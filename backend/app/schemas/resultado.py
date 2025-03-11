@@ -19,9 +19,9 @@ class ResultadoMesaInput(BaseModel):
     campeonato_id: int
     partida: int
     mesa: int
-    es_ultima_mesa: bool  # Nuevo campo para indicar si es la última mesa
+    es_ultima_mesa: bool  # Mantenemos este campo por compatibilidad
     # Jugadores de la primera pareja
-    jugador1_id: int
+    jugador1_id: Optional[int] = None
     jugador2_id: Optional[int] = None
     # Jugadores de la segunda pareja
     jugador3_id: Optional[int] = None
@@ -32,20 +32,6 @@ class ResultadoMesaInput(BaseModel):
     # Manos ganadas
     manos_ganadas_pareja1: int
     manos_ganadas_pareja2: Optional[int] = None
-
-    @validator('jugador2_id', 'jugador3_id', 'jugador4_id')
-    def validar_jugadores_mesa_normal(cls, v, values):
-        if 'es_ultima_mesa' in values and not values['es_ultima_mesa']:
-            # Si no es la última mesa, todos los jugadores son obligatorios
-            if v is None:
-                raise ValueError('Todas las mesas excepto la última deben tener 4 jugadores')
-        return v
-
-    @validator('jugador1_id')
-    def validar_jugador1_obligatorio(cls, v):
-        if v is None:
-            raise ValueError('El primer jugador es obligatorio en todas las mesas')
-        return v
 
     class Config:
         json_schema_extra = {

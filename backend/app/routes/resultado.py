@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.db.base import get_db
@@ -6,6 +6,7 @@ from app.models.resultado import Resultado
 from app.models.jugador import Jugador
 from app.models.pareja_partida import ParejaPartida
 from app.models.campeonato import Campeonato
+from app.models.mesa import Mesa
 from app.schemas.resultado import ResultadoMesaInput, Resultado as ResultadoSchema
 from sqlalchemy.sql import func
 
@@ -19,51 +20,34 @@ def calcular_PV(PT: int, PM: int) -> int:
 
 @router.post("/resultados/mesa/", response_model=List[ResultadoSchema])
 def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_db)):
+    response = Response()
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     # Obtener el PM del campeonato
     campeonato = db.query(Campeonato).filter(Campeonato.id == datos.campeonato_id).first()
     if not campeonato:
         raise HTTPException(status_code=404, detail="Campeonato no encontrado")
     
-    # Verificar si es la última mesa de la partida
-    ultima_mesa = db.query(func.max(ParejaPartida.mesa)).filter(
-        ParejaPartida.campeonato_id == datos.campeonato_id,
-        ParejaPartida.partida == datos.partida
-    ).scalar()
-    
-    es_ultima_mesa = datos.mesa == ultima_mesa
-    
-    # Validar que los datos coincidan con es_ultima_mesa
-    if es_ultima_mesa != datos.es_ultima_mesa:
-        raise HTTPException(
-            status_code=400, 
-            detail="El indicador es_ultima_mesa no coincide con la mesa actual"
-        )
-    
-    # Si no es la última mesa, validar que tenga 4 jugadores
-    if not es_ultima_mesa:
-        if not all([datos.jugador1_id, datos.jugador2_id, datos.jugador3_id, datos.jugador4_id]):
-            raise HTTPException(
-                status_code=400,
-                detail="Las mesas que no son la última deben tener 4 jugadores"
-            )
-    
     # Inicializar lista de resultados
     resultados = []
     
-    # Verificar si la última mesa está incompleta
-    es_mesa_incompleta = es_ultima_mesa and (
+    # Verificar si la mesa está incompleta (cualquier jugador faltante o inactivo)
+    es_mesa_incompleta = (
+        datos.jugador1_id is None or 
         datos.jugador2_id is None or 
         datos.jugador3_id is None or 
         (datos.jugador3_id is not None and datos.jugador4_id is None)
     )
     
     if es_mesa_incompleta:
-        # Calcular puntos automáticos para mesa incompleta
-        PT_automatico = (campeonato.PM + 1) // 2  # Redondeo hacia arriba
+        # Calcular puntos para mesa incompleta
+        PT_automatico = round(campeonato.PM / 2)  # Redondeo al entero más cercano
         PV_automatico = PT_automatico
-        PC_automatico = PT_automatico
-        PG_automatico = 1
-        MG_automatico = (PT_automatico + 29) // 30  # Redondeo hacia arriba
+        PC_automatico = PT_automatico  # PC debe ser igual a PT para mesas incompletas
+        PG_automatico = 1  # Todos ganan
+        MG_automatico = PT_automatico // 30  # División entera de PT entre 30
         
         # Crear resultados para todos los jugadores presentes con los mismos valores
         jugadores = [
@@ -107,33 +91,29 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
             PC_pareja2 = PV_pareja2 - PV_pareja1
             PG_pareja1 = 1 if PC_pareja1 > 0 else 0
             PG_pareja2 = 1 if PC_pareja2 > 0 else 0
-        else:  # Si no hay segunda pareja (solo posible en última mesa completa)
-            if not es_ultima_mesa:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Solo la última mesa puede tener una sola pareja"
-                )
+        else:  # Si no hay segunda pareja
             PC_pareja1 = PV_pareja1
             PG_pareja1 = 1
             PC_pareja2 = 0
             PG_pareja2 = 0
         
-        # Crear resultados para la primera pareja
-        resultado = Resultado(
-            partida=datos.partida,
-            mesa=datos.mesa,
-            jugador=1,
-            jugador_id=datos.jugador1_id,
-            pareja=1,
-            PT=PT_pareja1,
-            PV=PV_pareja1,
-            PC=PC_pareja1,
-            PG=PG_pareja1,
-            MG=datos.manos_ganadas_pareja1,
-            campeonato_id=datos.campeonato_id
-        )
-        db.add(resultado)
-        resultados.append(resultado)
+        # Crear resultados para los jugadores presentes
+        if datos.jugador1_id is not None:
+            resultado = Resultado(
+                partida=datos.partida,
+                mesa=datos.mesa,
+                jugador=1,
+                jugador_id=datos.jugador1_id,
+                pareja=1,
+                PT=PT_pareja1,
+                PV=PV_pareja1,
+                PC=PC_pareja1,
+                PG=PG_pareja1,
+                MG=datos.manos_ganadas_pareja1,
+                campeonato_id=datos.campeonato_id
+            )
+            db.add(resultado)
+            resultados.append(resultado)
         
         if datos.jugador2_id is not None:
             resultado = Resultado(
@@ -151,11 +131,6 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
             )
             db.add(resultado)
             resultados.append(resultado)
-        elif not es_ultima_mesa:
-            raise HTTPException(
-                status_code=400,
-                detail="Las mesas que no son la última deben tener pareja completa"
-            )
         
         # Crear resultados para la segunda pareja si existe
         if datos.jugador3_id is not None:
@@ -191,16 +166,6 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
                 )
                 db.add(resultado)
                 resultados.append(resultado)
-            elif not es_ultima_mesa:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Las mesas que no son la última deben tener parejas completas"
-                )
-        elif not es_ultima_mesa:
-            raise HTTPException(
-                status_code=400,
-                detail="Las mesas que no son la última deben tener dos parejas"
-            )
     
     try:
         db.commit()
@@ -268,6 +233,11 @@ def read_resultados_by_mesa(campeonato_id: int, partida: int, mesa: int, db: Ses
 @router.put("/resultados/mesa/", response_model=List[ResultadoSchema])
 def update_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_db)):
     """Actualiza los resultados existentes de una mesa"""
+    response = Response()
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     # Primero verificamos que existan los resultados
     resultados = db.query(Resultado).filter(
         Resultado.campeonato_id == datos.campeonato_id,
@@ -485,4 +455,44 @@ async def debug_resultados_partida(campeonato_id: int, partida: int, db: Session
 
     except Exception as e:
         print(f"Error en debug_resultados_partida: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error al obtener los resultados: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error al obtener los resultados: {str(e)}")
+
+@router.get("/mesas-registradas/{campeonato_id}/{partida}")
+def get_mesas_registradas(campeonato_id: int, partida: int, db: Session = Depends(get_db)):
+    """Obtiene las mesas que tienen resultados registrados para una partida específica"""
+    # Verificar que el campeonato existe
+    campeonato = db.query(Campeonato).filter(Campeonato.id == campeonato_id).first()
+    if not campeonato:
+        raise HTTPException(status_code=404, detail="Campeonato no encontrado")
+    
+    # Obtener todas las mesas para esta partida
+    mesas = db.query(Mesa).filter(
+        Mesa.campeonato_id == campeonato_id,
+        Mesa.partida == partida
+    ).all()
+    
+    # Obtener los resultados registrados
+    resultados = db.query(Resultado).filter(
+        Resultado.campeonato_id == campeonato_id,
+        Resultado.partida == partida
+    ).all()
+    
+    # Crear un diccionario con las mesas que tienen resultados
+    mesas_registradas = {}
+    for resultado in resultados:
+        mesas_registradas[resultado.mesa] = True
+    
+    # Verificar si todas las mesas tienen resultados
+    todas_registradas = True
+    if mesas:
+        for mesa in mesas:
+            if mesa.numero_mesa not in mesas_registradas:
+                todas_registradas = False
+                break
+    else:
+        todas_registradas = False
+    
+    return {
+        "mesas_registradas": mesas_registradas,
+        "todas_registradas": todas_registradas
+    } 

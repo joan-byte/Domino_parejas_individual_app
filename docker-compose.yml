@@ -39,20 +39,25 @@ services:
       postgres:
         condition: service_healthy
     secrets:
+      - postgres_user
       - postgres_password
-      - secret_key
+      - postgres_db
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/docs || exit 1"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 5s
 
 volumes:
   postgres_data:
 
 secrets:
+  postgres_user:
+    file: ./secrets/postgres_user.txt
   postgres_password:
     file: ./secrets/postgres_password.txt
+  postgres_db:
+    file: ./secrets/postgres_db.txt
   secret_key:
     file: ./secrets/secret_key.txt 

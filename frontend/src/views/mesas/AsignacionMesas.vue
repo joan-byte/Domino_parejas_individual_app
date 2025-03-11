@@ -9,6 +9,7 @@
       </div>
     </div>
     
+    <!-- Vista normal -->
     <div v-if="jugadoresPaginados.length > 0" class="no-print">
       <table class="jugadores-table">
         <thead>
@@ -34,6 +35,35 @@
       </table>
       <div class="paginacion-info">
         Página {{ paginaActual + 1 }} de {{ totalPaginas }}
+      </div>
+    </div>
+
+    <!-- Vista de impresión -->
+    <div class="print-only">
+      <div v-for="mesa in mesasParaImprimir" :key="mesa.numeroMesa" class="mesa-print">
+        <h3>Mesa {{ mesa.numeroMesa }}</h3>
+        <div class="parejas-print">
+          <!-- Pareja 1 -->
+          <div class="pareja-print" v-if="mesa.pareja1">
+            <h4>Pareja 1</h4>
+            <div v-if="mesa.pareja1.jugador1" class="jugador-print">
+              {{ mesa.pareja1.jugador1.nombre }} {{ mesa.pareja1.jugador1.apellidos }}
+            </div>
+            <div v-if="mesa.pareja1.jugador2" class="jugador-print">
+              {{ mesa.pareja1.jugador2.nombre }} {{ mesa.pareja1.jugador2.apellidos }}
+            </div>
+          </div>
+          <!-- Pareja 2 -->
+          <div class="pareja-print" v-if="mesa.pareja2">
+            <h4>Pareja 2</h4>
+            <div v-if="mesa.pareja2.jugador1" class="jugador-print">
+              {{ mesa.pareja2.jugador1.nombre }} {{ mesa.pareja2.jugador1.apellidos }}
+            </div>
+            <div v-if="mesa.pareja2.jugador2" class="jugador-print">
+              {{ mesa.pareja2.jugador2.nombre }} {{ mesa.pareja2.jugador2.apellidos }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -164,29 +194,53 @@ const jugadoresOrdenados = computed(() => {
   // Usar un Map para asegurarnos de que cada jugador aparezca solo una vez
   const jugadoresMap = new Map()
 
-  parejas.value.forEach(pareja => {
-    // Procesar jugador1 siempre que exista
-    if (pareja.jugador1) {
-      jugadoresMap.set(pareja.jugador1_id, {
-        id: pareja.jugador1_id,
-        nombre: pareja.jugador1.nombre || '',
-        apellidos: pareja.jugador1.apellidos || '',
-        club: pareja.jugador1.club || '',
-        mesa: pareja.mesa,
-        numero_pareja: pareja.numero_pareja
-      })
+  parejas.value.forEach(mesa => {
+    // Procesar jugadores de la pareja1
+    if (mesa.pareja1) {
+      if (mesa.pareja1.jugador1 && mesa.pareja1.jugador1.activo) {
+        jugadoresMap.set(mesa.pareja1.jugador1_id, {
+          id: mesa.pareja1.jugador1_id,
+          nombre: mesa.pareja1.jugador1.nombre,
+          apellidos: mesa.pareja1.jugador1.apellidos,
+          club: mesa.pareja1.jugador1.club,
+          mesa: mesa.numeroMesa,
+          numero_pareja: mesa.pareja1.numero_pareja
+        })
+      }
+      if (mesa.pareja1.jugador2 && mesa.pareja1.jugador2.activo) {
+        jugadoresMap.set(mesa.pareja1.jugador2_id, {
+          id: mesa.pareja1.jugador2_id,
+          nombre: mesa.pareja1.jugador2.nombre,
+          apellidos: mesa.pareja1.jugador2.apellidos,
+          club: mesa.pareja1.jugador2.club,
+          mesa: mesa.numeroMesa,
+          numero_pareja: mesa.pareja1.numero_pareja
+        })
+      }
     }
     
-    // Procesar jugador2 siempre que exista
-    if (pareja.jugador2) {
-      jugadoresMap.set(pareja.jugador2_id, {
-        id: pareja.jugador2_id,
-        nombre: pareja.jugador2.nombre || '',
-        apellidos: pareja.jugador2.apellidos || '',
-        club: pareja.jugador2.club || '',
-        mesa: pareja.mesa,
-        numero_pareja: pareja.numero_pareja
-      })
+    // Procesar jugadores de la pareja2
+    if (mesa.pareja2) {
+      if (mesa.pareja2.jugador1 && mesa.pareja2.jugador1.activo) {
+        jugadoresMap.set(mesa.pareja2.jugador1_id, {
+          id: mesa.pareja2.jugador1_id,
+          nombre: mesa.pareja2.jugador1.nombre,
+          apellidos: mesa.pareja2.jugador1.apellidos,
+          club: mesa.pareja2.jugador1.club,
+          mesa: mesa.numeroMesa,
+          numero_pareja: mesa.pareja2.numero_pareja
+        })
+      }
+      if (mesa.pareja2.jugador2 && mesa.pareja2.jugador2.activo) {
+        jugadoresMap.set(mesa.pareja2.jugador2_id, {
+          id: mesa.pareja2.jugador2_id,
+          nombre: mesa.pareja2.jugador2.nombre,
+          apellidos: mesa.pareja2.jugador2.apellidos,
+          club: mesa.pareja2.jugador2.club,
+          mesa: mesa.numeroMesa,
+          numero_pareja: mesa.pareja2.numero_pareja
+        })
+      }
     }
   })
 
@@ -266,7 +320,6 @@ const cargarParejas = async () => {
     // Obtener información actualizada del campeonato
     await obtenerInfoCampeonato()
     
-    // Si después de todo no tenemos un ID o partida actual, salir
     if (!campeonatoId.value) {
       console.error('No hay ID de campeonato para cargar parejas')
       return
@@ -274,42 +327,25 @@ const cargarParejas = async () => {
     
     console.log('Cargando parejas para campeonato:', campeonatoId.value, 'partida:', partidaActual.value)
     
-    // Si la partida actual es 0, no hay nada que cargar
     if (partidaActual.value === 0) {
       console.log('La partida actual es 0, no hay parejas para cargar')
       parejas.value = []
       return
     }
     
-    // Obtener las parejas de la partida actual
-    const parejasResponse = await fetch(`http://localhost:8000/api/parejas-partida/campeonato/${campeonatoId.value}/partida/${partidaActual.value}`)
-    if (!parejasResponse.ok) {
-      console.error('Error al cargar las parejas:', parejasResponse.statusText)
+    // Obtener las parejas usando el endpoint de mesas
+    const mesasResponse = await fetch(`http://localhost:8000/api/parejas-partida/mesas/${campeonatoId.value}/${partidaActual.value}`)
+    if (!mesasResponse.ok) {
+      console.error('Error al cargar las mesas:', mesasResponse.statusText)
       parejas.value = []
       return
     }
     
-    const parejasData = await parejasResponse.json()
-    console.log('Parejas cargadas:', parejasData.length)
+    const mesasData = await mesasResponse.json()
+    console.log('Datos de mesas cargados:', mesasData)
 
-    // Asignar los puntos iniciales a cada jugador
-    parejas.value = parejasData.map(pareja => ({
-      ...pareja,
-      jugador1: {
-        ...pareja.jugador1,
-        PG: pareja.jugador1?.PP || 150,
-        PC: pareja.jugador1?.PC || 0
-      },
-      jugador2: pareja.jugador2 ? {
-        ...pareja.jugador2,
-        PG: pareja.jugador2?.PP || 150,
-        PC: pareja.jugador2?.PC || 0
-      } : null
-    }))
-
-    if (jugadoresOrdenados.value.length > jugadoresPorPagina) {
-      iniciarPaginacionAutomatica()
-    }
+    // Guardar los datos directamente como vienen de la API
+    parejas.value = mesasData
   } catch (error) {
     console.error('Error al cargar los datos:', error)
     parejas.value = []
@@ -369,28 +405,16 @@ onUnmounted(() => {
 
 // Computed para tener un array plano de mesas
 const mesasAplanadas = computed(() => {
-  const mesasMap = new Map()
-  
-  parejas.value.forEach(pareja => {
-    if (!mesasMap.has(pareja.mesa)) {
-      mesasMap.set(pareja.mesa, {
-        numero: parseInt(pareja.mesa),
-        pareja1: null,
-        pareja2: null
-      })
-    }
-    
-    const mesaActual = mesasMap.get(pareja.mesa)
-    if (pareja.numero_pareja === 1) {
-      mesaActual.pareja1 = pareja
-    } else if (pareja.numero_pareja === 2) {
-      mesaActual.pareja2 = pareja
-    }
-  })
+  if (!parejas.value || !Array.isArray(parejas.value)) {
+    return []
+  }
 
-  // Convertir el Map a array y mantener todas las mesas, incluso las incompletas
-  return Array.from(mesasMap.values())
-    .sort((a, b) => parseInt(a.numero) - parseInt(b.numero))
+  // Los datos ya vienen organizados por mesas, solo necesitamos mapearlos
+  return parejas.value.map(mesa => ({
+    numero: mesa.numeroMesa,
+    pareja1: mesa.pareja1,
+    pareja2: mesa.pareja2
+  })).sort((a, b) => a.numero - b.numero)
 })
 
 // Computed para tener las mesas organizadas por páginas
@@ -404,6 +428,14 @@ const mesasPorPagina = computed(() => {
     paginas.push(pagina)
   }
   return paginas
+})
+
+// Computed para la vista de impresión
+const mesasParaImprimir = computed(() => {
+  if (!parejas.value || !Array.isArray(parejas.value)) {
+    return []
+  }
+  return parejas.value
 })
 </script>
 
@@ -476,6 +508,53 @@ const mesasPorPagina = computed(() => {
 @media print {
   .no-print {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .mesa-print {
+    page-break-inside: avoid;
+    margin-bottom: 20px;
+    border: 1px solid #000;
+    padding: 15px;
+    margin: 10px;
+  }
+
+  .mesa-print h3 {
+    margin-bottom: 10px;
+    border-bottom: 1px solid #000;
+    padding-bottom: 5px;
+    text-align: center;
+  }
+
+  .parejas-print {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 10px;
+  }
+
+  .pareja-print {
+    flex: 1;
+    margin: 0 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+  }
+
+  .pareja-print h4 {
+    margin-bottom: 10px;
+    text-align: center;
+    background-color: #f5f5f5;
+    padding: 5px;
+  }
+
+  .jugador-print {
+    margin: 8px 0;
+    padding: 8px;
+    border: 1px solid #eee;
+    text-align: center;
+    background-color: white;
   }
 }
 
