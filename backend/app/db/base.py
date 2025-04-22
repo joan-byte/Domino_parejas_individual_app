@@ -16,44 +16,27 @@ from app.models.resultado import Resultado
 from app.models.mesa import Mesa
 from app.models.pareja_partida import ParejaPartida
 
-def get_env_value(env_name, default_value):
-    # Primero intentar leer del archivo si existe la variable _FILE
-    file_env = os.getenv(f"{env_name}_FILE")
-    if file_env and os.path.exists(file_env):
-        with open(file_env) as f:
-            return f.read().strip()
-    
-    # Si no hay archivo o no se puede leer, usar la variable de entorno directa
-    return os.getenv(env_name, default_value)
+# Cargar variables de entorno directamente usando os.getenv y los defaults
+# .env será cargado por load_dotenv()
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "domino_parejas_individualdb")
+DB_USER = os.getenv("DB_USER", "individual")
+DB_PASS = os.getenv("DB_PASS", "375CheyTac") # Asegúrate que este default es seguro o elimina el default
 
-# Construir la URL de la base de datos usando la nueva función
-DB_HOST = get_env_value("DB_HOST", "localhost")
-DB_PORT = get_env_value("DB_PORT", "5432")
-DB_NAME = get_env_value("DB_NAME", "domino_parejas_individualdb")
-DB_USER = get_env_value("DB_USER", "individual")
-DB_PASS = get_env_value("DB_PASS", "375CheyTac")
-
-# Intentar leer desde los archivos de secrets primero
-try:
-    with open('/run/secrets/postgres_user', 'r') as f:
-        DB_USER = f.read().strip()
-    with open('/run/secrets/postgres_password', 'r') as f:
-        DB_PASS = f.read().strip()
-    with open('/run/secrets/postgres_db', 'r') as f:
-        DB_NAME = f.read().strip()
-except Exception as e:
-    print(f"Warning: Could not read from secrets files: {e}")
-    # Mantener los valores por defecto si no se pueden leer los secrets
-
+# Construir la URL con las variables cargadas de .env o defaults
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-print(f"Connecting to database with URL: {DATABASE_URL}")
+print(f"Connecting to database with URL: {DATABASE_URL}") # Mantenemos este print para confirmar
 
 # Crear el motor de la base de datos
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    # Configuración adicional para manejar la zona horaria
-    connect_args={"options": "-c timezone=utc"}
+    # Configuración adicional para manejar la zona horaria y codificación
+    connect_args={
+        "options": "-c timezone=utc -c client_encoding=utf8",
+        "client_encoding": "utf8"
+    }
 )
 
 # Crear la sesión

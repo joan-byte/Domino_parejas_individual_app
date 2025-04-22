@@ -58,7 +58,6 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import axios from 'axios'
 
 const router = useRouter()
 const route = useRoute()
@@ -97,7 +96,8 @@ const modificarCampeonato = (id) => {
 const eliminarCampeonato = async (id) => {
   if (confirm('¿Está seguro de que desea eliminar este campeonato?')) {
     try {
-      const response = await axios.delete(`http://localhost:8000/api/campeonatos/${id}`, {
+      const response = await fetch(`/api/campeonatos/${id}`, {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
@@ -108,7 +108,6 @@ const eliminarCampeonato = async (id) => {
         if (campeonatoSeleccionado.value?.id === id) {
           campeonatoSeleccionado.value = null
           localStorage.removeItem('campeonatoSeleccionado')
-          // Disparar evento storage para actualizar otros componentes
           window.dispatchEvent(new Event('storage'))
         }
         alert('Campeonato eliminado exitosamente')
@@ -118,10 +117,8 @@ const eliminarCampeonato = async (id) => {
       console.error('Error al eliminar el campeonato:', error)
       let mensajeError = 'Error al eliminar el campeonato'
       if (error.response) {
-        // El servidor respondió con un código de error
         mensajeError = error.response.data?.detail || mensajeError
       } else if (error.request) {
-        // La petición fue hecha pero no se recibió respuesta
         mensajeError = 'No se pudo conectar con el servidor'
       }
       alert(mensajeError)
@@ -166,20 +163,13 @@ watch(() => route.path, async (newPath) => {
 
 const cargarCampeonatos = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/campeonatos/')
-    if (response.status === 200) {
-      campeonatos.value = response.data
+    const response = await fetch('/api/campeonatos/')
+    if (response.ok) {
+      campeonatos.value = await response.json()
       
-      // Para cada campeonato, obtener la información directamente del objeto campeonato
       for (const campeonato of campeonatos.value) {
         try {
-          // Usar la partida_actual que ya viene en el objeto campeonato
           campeonato.ultima_partida = campeonato.partida_actual
-          
-          // Si necesitas más información específica sobre la partida, puedes hacer una solicitud adicional
-          // a un endpoint que sí exista, como por ejemplo:
-          // const partidaResponse = await axios.get(`http://localhost:8000/api/campeonatos/${campeonato.id}`)
-          // campeonato.ultima_partida = partidaResponse.data.partida_actual
         } catch (error) {
           console.error(`Error al obtener la última partida del campeonato ${campeonato.id}:`, error)
         }

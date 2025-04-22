@@ -71,7 +71,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import axios from 'axios'
 
 const router = useRouter()
 const route = useRoute()
@@ -87,8 +86,12 @@ const campeonato = ref({
 const cargarCampeonato = async () => {
   try {
     const id = route.params.id
-    const response = await axios.get(`http://localhost:8000/api/campeonatos/${id}`)
-    campeonato.value = response.data
+    const response = await fetch(`/api/campeonatos/${id}`)
+    if (response.ok) {
+      campeonato.value = await response.json()
+    } else {
+      throw new Error('Error al cargar el campeonato')
+    }
   } catch (error) {
     alert('Error al cargar el campeonato')
     router.push('/')
@@ -98,9 +101,20 @@ const cargarCampeonato = async () => {
 const guardarCambios = async () => {
   try {
     const id = route.params.id
-    await axios.put(`http://localhost:8000/api/campeonatos/${id}`, campeonato.value)
-    alert('Campeonato modificado exitosamente')
-    router.push('/')
+    const response = await fetch(`/api/campeonatos/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(campeonato.value)
+    })
+    
+    if (response.ok) {
+      alert('Campeonato modificado exitosamente')
+      router.push('/')
+    } else {
+      throw new Error('Error al modificar el campeonato')
+    }
   } catch (error) {
     alert('Error al modificar el campeonato')
   }

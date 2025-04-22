@@ -489,11 +489,13 @@ const cerrarPartidaActual = async () => {
       throw new Error(`Error al cerrar la partida: ${response.status}`)
     }
 
+    const data = await response.json()
+    
     // Recargar el estado del campeonato
     await recargarEstadoCampeonato()
     
-    // Si es la última partida, cambiar la vista del monitor 2 a podium
-    if (partidaActual.value === campeonatoSeleccionado.value?.numero_partidas) {
+    // Solo cambiar a la vista de podium si el campeonato está finalizado
+    if (data.mensaje === "Campeonato finalizado") {
       if (ventanaSecundaria.value && !ventanaSecundaria.value.closed) {
         ventanaSecundaria.value.location.href = `/resultados/podium/${campeonatoId.value}`
       } else {

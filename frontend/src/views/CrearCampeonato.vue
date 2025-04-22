@@ -71,7 +71,6 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 
 const router = useRouter()
 
@@ -104,7 +103,7 @@ const crearCampeonato = async () => {
     }
 
     // Verificar campeonatos existentes
-    const verificarResponse = await fetch(`http://localhost:8000/api/campeonatos/`);
+    const verificarResponse = await fetch('/api/campeonatos/');
     if (!verificarResponse.ok) {
       throw new Error('Error al verificar campeonatos existentes');
     }
@@ -142,7 +141,7 @@ const crearCampeonato = async () => {
 
     console.log('Datos completos a enviar:', JSON.stringify(datosCampeonato, null, 2));
 
-    const response = await fetch('http://localhost:8000/api/campeonatos/', {
+    const response = await fetch('/api/campeonatos/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

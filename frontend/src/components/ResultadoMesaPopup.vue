@@ -319,6 +319,19 @@ const calcularPuntos = (parejaNum) => {
       parejaContraria.PG = 1
       parejaContraria.MG = Math.floor(PT / 30)
     }
+  } else if (props.esUltimaMesa && !esMesaIncompleta.value) {
+    // Si es la última mesa y está completa, calcular diferencias normalmente
+    if (pareja.PT < 0) pareja.PT = 0
+    if (pareja.PT > campeonatoPM.value * 2) pareja.PT = campeonatoPM.value * 2
+    
+    pareja.PV = Math.min(pareja.PT, campeonatoPM.value)
+    parejaContraria.PV = Math.min(parejaContraria.PT, campeonatoPM.value)
+    
+    pareja.PC = pareja.PV - parejaContraria.PV
+    parejaContraria.PC = parejaContraria.PV - pareja.PV
+    
+    pareja.PG = pareja.PC > 0 ? 1 : 0
+    parejaContraria.PG = parejaContraria.PC > 0 ? 1 : 0
   } else {
     if (pareja.PT < 0) pareja.PT = 0
     if (pareja.PT > campeonatoPM.value * 2) pareja.PT = campeonatoPM.value * 2
@@ -507,14 +520,14 @@ watch(() => props.show, async (newVal) => {
   if (props.resultadoExistente) {
     await nextTick()
     cargarResultadoExistente()
-  } else if (esMesaIncompleta.value) {
+  } else if (esMesaIncompleta.value || props.esUltimaMesa) {
     asignarPuntosAutomaticos()
   }
 
   nextTick(() => {
     const inputs = document.querySelectorAll('.pareja-resultados input')
     inputs.forEach(input => {
-      const isDisabled = esMesaIncompleta.value || 
+      const isDisabled = esMesaIncompleta.value || props.esUltimaMesa ||
                         input.id.includes('pv-') || 
                         input.id.includes('pg-') || 
                         input.id.includes('pc-')

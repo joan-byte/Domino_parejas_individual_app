@@ -34,11 +34,27 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
     resultados = []
     
     # Verificar si la mesa está incompleta (cualquier jugador faltante o inactivo)
+    es_mesa_incompleta = False
+    
+    # Obtener los jugadores para verificar su estado activo
+    jugadores = []
+    if datos.jugador1_id:
+        jugador1 = db.query(Jugador).filter(Jugador.id == datos.jugador1_id).first()
+        jugadores.append((1, jugador1))
+    if datos.jugador2_id:
+        jugador2 = db.query(Jugador).filter(Jugador.id == datos.jugador2_id).first()
+        jugadores.append((2, jugador2))
+    if datos.jugador3_id:
+        jugador3 = db.query(Jugador).filter(Jugador.id == datos.jugador3_id).first()
+        jugadores.append((3, jugador3))
+    if datos.jugador4_id:
+        jugador4 = db.query(Jugador).filter(Jugador.id == datos.jugador4_id).first()
+        jugadores.append((4, jugador4))
+    
+    # Verificar si algún jugador está inactivo o falta
     es_mesa_incompleta = (
-        datos.jugador1_id is None or 
-        datos.jugador2_id is None or 
-        datos.jugador3_id is None or 
-        (datos.jugador3_id is not None and datos.jugador4_id is None)
+        len(jugadores) < 4 or 
+        any(not jugador.activo for _, jugador in jugadores if jugador)
     )
     
     if es_mesa_incompleta:
@@ -49,22 +65,15 @@ def create_resultados_mesa(datos: ResultadoMesaInput, db: Session = Depends(get_
         PG_automatico = 1  # Todos ganan
         MG_automatico = PT_automatico // 30  # División entera de PT entre 30
         
-        # Crear resultados para todos los jugadores presentes con los mismos valores
-        jugadores = [
-            (1, datos.jugador1_id),
-            (2, datos.jugador2_id),
-            (3, datos.jugador3_id),
-            (4, datos.jugador4_id)
-        ]
-        
-        for num_jugador, jugador_id in jugadores:
-            if jugador_id is not None:
+        # Crear resultados solo para los jugadores activos
+        for num_jugador, jugador in jugadores:
+            if jugador and jugador.activo:
                 pareja = 1 if num_jugador <= 2 else 2
                 resultado = Resultado(
                     partida=datos.partida,
                     mesa=datos.mesa,
                     jugador=num_jugador,
-                    jugador_id=jugador_id,
+                    jugador_id=jugador.id,
                     pareja=pareja,
                     PT=PT_automatico,
                     PV=PV_automatico,
@@ -332,6 +341,7 @@ async def get_ranking_campeonato(campeonato_id: int, partida: int = None, db: Se
         resultados_query = db.query(
             Resultado.jugador_id,
             func.sum(Resultado.PT).label('PT'),
+            func.sum(Resultado.PV).label('PV'),
             func.sum(Resultado.PG).label('PG'),
             func.sum(Resultado.PC).label('PC'),
             func.sum(Resultado.MG).label('MG'),
@@ -364,6 +374,7 @@ async def get_ranking_campeonato(campeonato_id: int, partida: int = None, db: Se
                     "apellidos": jugador.apellidos,
                     "club": jugador.club,
                     "PT": int(resultados_jugador.PT) if resultados_jugador.PT is not None else 0,
+                    "PV": int(resultados_jugador.PV) if resultados_jugador.PV is not None else 0,
                     "PG": int(resultados_jugador.PG) if resultados_jugador.PG is not None else 0,
                     "PC": int(resultados_jugador.PC) if resultados_jugador.PC is not None else 0,
                     "MG": int(resultados_jugador.MG) if resultados_jugador.MG is not None else 0,
@@ -377,6 +388,7 @@ async def get_ranking_campeonato(campeonato_id: int, partida: int = None, db: Se
                     "apellidos": jugador.apellidos,
                     "club": jugador.club,
                     "PT": 0,
+                    "PV": 0,
                     "PG": 0,
                     "PC": 0,
                     "MG": 0,

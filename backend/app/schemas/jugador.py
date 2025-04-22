@@ -15,6 +15,8 @@ class JugadorBase(BaseModel):
         patron = r'^[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\s\'\-\.]+$'
         if not re.match(patron, v, re.UNICODE):
             raise ValueError('El campo solo puede contener letras (incluyendo acentos), espacios y algunos caracteres especiales (. - \')')
+        # Verificar que no haya espacios múltiples consecutivos y que no empiece ni termine con espacio
+        v = ' '.join(v.split())
         return v
 
 class JugadorCreate(JugadorBase):
@@ -33,6 +35,8 @@ class JugadorUpdate(BaseModel):
         patron = r'^[a-zA-ZàáâäãåąčćęèéêëėįìíîïłńòóôöõøùúûüųūÿýżźñçčšžÀÁÂÄÃÅĄĆČĖĘÈÉÊËÌÍÎÏĮŁŃÒÓÔÖÕØÙÚÛÜŲŪŸÝŻŹÑßÇŒÆČŠŽ∂ð\s\'\-\.]+$'
         if not re.match(patron, v, re.UNICODE):
             raise ValueError('El campo solo puede contener letras (incluyendo acentos), espacios y algunos caracteres especiales (. - \')')
+        # Verificar que no haya espacios múltiples consecutivos y que no empiece ni termine con espacio
+        v = ' '.join(v.split())
         return v
 
 class JugadorResponse(JugadorBase):

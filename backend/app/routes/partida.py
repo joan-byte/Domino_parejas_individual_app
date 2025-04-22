@@ -144,8 +144,13 @@ async def cerrar_partida(campeonato_id: int, partida: int, db: Session = Depends
             # Actualizar la partida actual
             campeonato.partida_actual = partida + 1
             
-        db.commit()
-        return {"mensaje": "Partida cerrada correctamente", "nueva_partida": partida + 1}
+            db.commit()
+            return {"mensaje": "Partida cerrada correctamente", "nueva_partida": partida + 1}
+        else:
+            # Si es la última partida, marcar el campeonato como finalizado
+            campeonato.finalizado = True
+            db.commit()
+            return {"mensaje": "Campeonato finalizado", "nueva_partida": partida}
     
     except Exception as e:
         db.rollback()

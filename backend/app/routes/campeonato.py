@@ -123,11 +123,49 @@ async def update_campeonato(campeonato_id: int, campeonato: CampeonatoUpdate, db
     if db_campeonato is None:
         raise HTTPException(status_code=404, detail="Campeonato no encontrado")
     
-    for key, value in campeonato.dict(exclude_unset=True).items():
+    # Actualizar los campos permitidos por el schema CampeonatoUpdate
+    update_data = campeonato.dict(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(db_campeonato, key, value)
+        
+    # --- Lógica de Recálculo de 'finalizado' ---
+    # Determinar si el campeonato debería estar finalizado AHORA.
+    # Asumimos que está finalizado si partida_actual es >= numero_partidas.
+    # (Asegúrate que la lógica de avance de partida_actual sea consistente con esto)
+    if isinstance(db_campeonato.partida_actual, int) and isinstance(db_campeonato.numero_partidas, int):
+         # Calcular el estado correcto basado en los números actuales
+         should_be_finished = db_campeonato.partida_actual >= db_campeonato.numero_partidas
+         
+         # Si el estado calculado es diferente al estado actual en la BD, actualizarlo.
+         if db_campeonato.finalizado != should_be_finished:
+              db_campeonato.finalizado = should_be_finished
+              logger.info(f"Campeonato ID {campeonato_id} 'finalizado' status recalculado y establecido a {should_be_finished} (partida_actual={db_campeonato.partida_actual}, numero_partidas={db_campeonato.numero_partidas}).")
+    else:
+         # Loguear una advertencia si los tipos no son correctos para la comparación
+         logger.warning(f"No se pudo recalcular el estado 'finalizado' para Campeonato ID {campeonato_id} debido a tipos inválidos.")
+    # -------------------------------------------
     
-    db.commit()
-    db.refresh(db_campeonato)
+    logger.info(f"Antes de commit - ID: {db_campeonato.id}, finalizado: {db_campeonato.finalizado}")
+
+    try:
+        # Intentar guardar todos los cambios en la base de datos
+        db.commit()
+        logger.info(f"Después de commit - ¿Commit exitoso?")
+    except Exception as e:
+        # Si falla el commit, hacer rollback y loguear/lanzar error
+        db.rollback()
+        logger.error(f"Error durante db.commit() en campeonato {campeonato_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al guardar cambios en la base de datos")
+
+    try:
+        db.refresh(db_campeonato)
+        logger.info(f"Después de refresh - ID: {db_campeonato.id}, finalizado: {db_campeonato.finalizado}")
+    except Exception as e:
+        logger.error(f"Error durante db.refresh() en campeonato {campeonato_id}: {str(e)}")
+        # No relanzamos la excepción aquí, pero el estado puede ser inconsistente.
+        # Devolver el objeto tal como estaba después del (potencialmente fallido) refresh.
+        
+    # Devolver el estado final del campeonato después del commit y refresh
     return db_campeonato
 
 @router.delete("/{campeonato_id}", status_code=204)

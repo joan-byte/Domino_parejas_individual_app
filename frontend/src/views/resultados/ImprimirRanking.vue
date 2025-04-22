@@ -17,6 +17,7 @@
               <th>Partida</th>
               <th>PG</th>
               <th>Dif.</th>
+              <th>PV</th>
               <th>PT</th>
               <th>MG</th>
               <th>ID</th>
@@ -31,6 +32,7 @@
               <td>{{ jugador.ultima_partida }}</td>
               <td>{{ jugador.PG }}</td>
               <td>{{ jugador.PC }}</td>
+              <td>{{ jugador.PV }}</td>
               <td>{{ jugador.PT }}</td>
               <td>{{ jugador.MG }}</td>
               <td>{{ jugador.jugador_id }}</td>

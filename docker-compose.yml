@@ -2,55 +2,26 @@ version: '3.8'
 name: domino_parejas_individual
 
 services:
-  postgres:
-    container_name: domino_parejas_individual_db
-    image: postgres:15-alpine
-    platform: ${TARGETPLATFORM:-linux/amd64}
-    environment:
-      POSTGRES_USER_FILE: /run/secrets/postgres_user
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-      POSTGRES_DB_FILE: /run/secrets/postgres_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    secrets:
-      - postgres_user
-      - postgres_password
-      - postgres_db
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$(cat /run/secrets/postgres_user) -d $$(cat /run/secrets/postgres_db)"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
   app:
-    container_name: domino_parejas_individual_app
+    container_name: domino_parejas_individual
+    image: joanalba/domino_parejas_individual:latest
     build:
       context: .
-      dockerfile: Dockerfile
-      args:
-        BUILDPLATFORM: ${BUILDPLATFORM:-linux/amd64}
-        TARGETPLATFORM: ${TARGETPLATFORM:-linux/amd64}
-    image: domino_parejas_individual_local:latest
-    platform: ${TARGETPLATFORM:-linux/amd64}
+      platforms:
+        - linux/amd64
+        - linux/arm64
     ports:
       - "80:80"
       - "8000:8000"
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./secrets:/app/secrets
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER_FILE: /run/secrets/postgres_user
-      DB_PASS_FILE: /run/secrets/postgres_password
-      DB_NAME_FILE: /run/secrets/postgres_db
-      SECRET_KEY_FILE: /run/secrets/secret_key
-    depends_on:
-      postgres:
-        condition: service_healthy
-    secrets:
-      - postgres_user
-      - postgres_password
-      - postgres_db
-      - secret_key
+      - POSTGRES_USER_FILE=/app/secrets/postgres_user.txt
+      - POSTGRES_PASSWORD_FILE=/app/secrets/postgres_password.txt
+      - POSTGRES_DB_FILE=/app/secrets/postgres_db.txt
+      - SECRET_KEY_FILE=/app/secrets/secret_key.txt
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s
@@ -60,14 +31,4 @@ services:
 
 volumes:
   postgres_data:
-    name: domino_parejas_individual_db_data
-
-secrets:
-  postgres_user:
-    file: ./secrets/postgres_user.txt
-  postgres_password:
-    file: ./secrets/postgres_password.txt
-  postgres_db:
-    file: ./secrets/postgres_db.txt
-  secret_key:
-    file: ./secrets/secret_key.txt 
+    name: domino_parejas_individual_db_data 

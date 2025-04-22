@@ -16,7 +16,10 @@
               <span>Dif.: {{ secondPlace?.PC || '0' }}</span>
             </div>
             <div class="stat-row">
+              <span>PV: {{ secondPlace?.PV || '0' }}</span>
               <span>PT: {{ secondPlace?.PT || '0' }}</span>
+            </div>
+            <div class="stat-row">
               <span>MG: {{ secondPlace?.MG || '0' }}</span>
             </div>
           </div>
@@ -34,7 +37,10 @@
               <span>Dif.: {{ firstPlace?.PC || '0' }}</span>
             </div>
             <div class="stat-row">
+              <span>PV: {{ firstPlace?.PV || '0' }}</span>
               <span>PT: {{ firstPlace?.PT || '0' }}</span>
+            </div>
+            <div class="stat-row">
               <span>MG: {{ firstPlace?.MG || '0' }}</span>
             </div>
           </div>
@@ -52,7 +58,10 @@
               <span>Dif.: {{ thirdPlace?.PC || '0' }}</span>
             </div>
             <div class="stat-row">
+              <span>PV: {{ thirdPlace?.PV || '0' }}</span>
               <span>PT: {{ thirdPlace?.PT || '0' }}</span>
+            </div>
+            <div class="stat-row">
               <span>MG: {{ thirdPlace?.MG || '0' }}</span>
             </div>
           </div>
@@ -69,6 +78,7 @@
             <th>POSICIÓN</th>
             <th>PG</th>
             <th>Dif.</th>
+            <th>PV</th>
             <th>PT</th>
             <th>MG</th>
             <th>ID</th>
@@ -88,6 +98,7 @@
             <td>{{ calculatePosition(index) }} {{ getMedalEmoji(calculatePosition(index) - 1) }}</td>
             <td>{{ player.PG || 0 }}</td>
             <td>{{ player.PC || 0 }}</td>
+            <td>{{ player.PV || 0 }}</td>
             <td>{{ player.PT || 0 }}</td>
             <td>{{ player.MG || 0 }}</td>
             <td>{{ player.jugador_id }}</td>
